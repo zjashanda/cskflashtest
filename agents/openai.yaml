@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSK 烧录压测"
+  short_description: "CSK 串口烧录、启动校验、日志留存与多轮压力测试"
+  default_prompt: "使用 $cskflashtest 执行 CSK 烧录压测：预检、烧录、校验启动日志并保留完整证据。"

@@ -1,0 +1,15 @@
+{
+  "_note": "10 台设备端口映射示例。把 COMxx 替换成实际端口后，将 enabled 改为 true。每台设备的 control/csk/burn 必须唯一，hisi 可选。",
+  "devices": [
+    {"id": "dev01", "control": "COM14", "csk": "COM13", "burn": "COM15", "hisi": "COM18", "enabled": true},
+    {"id": "dev02", "control": "COM24", "csk": "COM23", "burn": "COM25", "hisi": "COM28", "enabled": true},
+    {"id": "dev03", "control": "COM34", "csk": "COM33", "burn": "COM35", "hisi": "COM38", "enabled": true},
+    {"id": "dev04", "control": "COM44", "csk": "COM43", "burn": "COM45", "hisi": "COM48", "enabled": true},
+    {"id": "dev05", "control": "COM54", "csk": "COM53", "burn": "COM55", "hisi": "COM58", "enabled": true},
+    {"id": "dev06", "control": "COM64", "csk": "COM63", "burn": "COM65", "hisi": "COM68", "enabled": true},
+    {"id": "dev07", "control": "COM74", "csk": "COM73", "burn": "COM75", "hisi": "COM78", "enabled": true},
+    {"id": "dev08", "control": "COM84", "csk": "COM83", "burn": "COM85", "hisi": "COM88", "enabled": true},
+    {"id": "dev09", "control": "COM94", "csk": "COM93", "burn": "COM95", "hisi": "COM98", "enabled": true},
+    {"id": "dev10", "control": "COM104", "csk": "COM103", "burn": "COM105", "hisi": "COM108", "enabled": true}
+  ]
+}

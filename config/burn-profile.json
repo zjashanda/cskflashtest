@@ -1,0 +1,1205 @@
+{
+  "schema_version": 2,
+  "profile_id": "cskflashtest-pressure",
+  "contract_mode": "formal",
+  "ports": [
+    {
+      "port": "COM14",
+      "baudrate": 115200,
+      "role": "control",
+      "capabilities": [
+        "write"
+      ],
+      "required_for": [
+        "control"
+      ]
+    },
+    {
+      "port": "COM13",
+      "baudrate": 115200,
+      "role": "csk",
+      "capabilities": [
+        "read"
+      ],
+      "required_for": [
+        "boot_evidence"
+      ]
+    },
+    {
+      "port": "COM18",
+      "baudrate": 1500000,
+      "role": "hisi",
+      "capabilities": [
+        "read"
+      ],
+      "required_for": []
+    }
+  ],
+  "recovery": {
+    "initialization_timeout_s": 30.0,
+    "restart_poll_interval_s": 0.1,
+    "stable_for_s": 0.5
+  },
+  "event_rules": [
+    {
+      "rule_id": "control-switch-off",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "control"
+        ],
+        "roles": [
+          "control"
+        ]
+      },
+      "regex": "switch_idx1_set:\\s*(?P<state>0)\\b",
+      "presentation_capture": "state",
+      "display_captures": [
+        {
+          "tag_name": "switch",
+          "capture": "state"
+        }
+      ],
+      "stage": "power_off",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "power_off"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[A/I:274247:_] switch_idx1_set: 0",
+            "source": "control",
+            "port": "COM14",
+            "role": "control",
+            "presentation": "0"
+          }
+        ],
+        "negative": [
+          {
+            "text": "[A/I:274247:_] switch_idx1_set: 1",
+            "source": "control",
+            "port": "COM14",
+            "role": "control"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "control-switch-on",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "control"
+        ],
+        "roles": [
+          "control"
+        ]
+      },
+      "regex": "switch_idx1_set:\\s*(?P<state>1)\\b",
+      "presentation_capture": "state",
+      "display_captures": [
+        {
+          "tag_name": "switch",
+          "capture": "state"
+        }
+      ],
+      "stage": "power_on",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "power_on"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[A/I:274409:_] switch_idx1_set: 1",
+            "source": "control",
+            "port": "COM14",
+            "role": "control",
+            "presentation": "1"
+          }
+        ],
+        "negative": [
+          {
+            "text": "[A/I:274409:_] switch_idx1_set: 0",
+            "source": "control",
+            "port": "COM14",
+            "role": "control"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "control-boot-off",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "control"
+        ],
+        "roles": [
+          "control"
+        ]
+      },
+      "regex": "csk6012_boot_set:\\s*(?P<state>0)\\b",
+      "presentation_capture": "state",
+      "display_captures": [
+        {
+          "tag_name": "boot",
+          "capture": "state"
+        }
+      ],
+      "stage": "boot_exit",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "boot_exit"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[A/I:274301:_] csk6012_boot_set: 0",
+            "source": "control",
+            "port": "COM14",
+            "role": "control",
+            "presentation": "0"
+          }
+        ],
+        "negative": [
+          {
+            "text": "[A/I:274301:_] csk6012_boot_set: 1",
+            "source": "control",
+            "port": "COM14",
+            "role": "control"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "control-boot-on",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "control"
+        ],
+        "roles": [
+          "control"
+        ]
+      },
+      "regex": "csk6012_boot_set:\\s*(?P<state>1)\\b",
+      "presentation_capture": "state",
+      "display_captures": [
+        {
+          "tag_name": "boot",
+          "capture": "state"
+        }
+      ],
+      "stage": "boot_enter",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "boot_enter"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[A/I:274355:_] csk6012_boot_set: 1",
+            "source": "control",
+            "port": "COM14",
+            "role": "control",
+            "presentation": "1"
+          }
+        ],
+        "negative": [
+          {
+            "text": "[A/I:274355:_] csk6012_boot_set: 0",
+            "source": "control",
+            "port": "COM14",
+            "role": "control"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "burn-connect",
+      "event_type": "command_evidence",
+      "sources": {
+        "sources": [
+          "burn_tool"
+        ],
+        "roles": [
+          "burn"
+        ]
+      },
+      "regex": "(?P<result>CONNECT WITH CHIP SUCCESS)",
+      "presentation_capture": "result",
+      "display_captures": [
+        {
+          "tag_name": "connect",
+          "capture": "result"
+        }
+      ],
+      "stage": "burn",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "burn"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "CONNECT WITH CHIP SUCCESS",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn",
+            "presentation": "CONNECT WITH CHIP SUCCESS"
+          }
+        ],
+        "negative": [
+          {
+            "text": "CONNECT WITH CHIP FAIL",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "burn-chip",
+      "event_type": "command_evidence",
+      "sources": {
+        "sources": [
+          "burn_tool"
+        ],
+        "roles": [
+          "burn"
+        ]
+      },
+      "regex": "CHIP TYPE\\s*=\\s*(?P<chip>0x[0-9A-Fa-f]+)",
+      "presentation_capture": "chip",
+      "display_captures": [
+        {
+          "tag_name": "chip",
+          "capture": "chip"
+        }
+      ],
+      "stage": "burn",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "burn"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "CHIP TYPE = 0x60120001",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn",
+            "presentation": "0x60120001"
+          }
+        ],
+        "negative": [
+          {
+            "text": "CHIP TYPE UNKNOWN",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "burn-baud",
+      "event_type": "command_evidence",
+      "sources": {
+        "sources": [
+          "burn_tool"
+        ],
+        "roles": [
+          "burn"
+        ]
+      },
+      "regex": "(?P<result>CHANGE BAUDRATE COMMAND SUCCESS)",
+      "presentation_capture": "result",
+      "display_captures": [
+        {
+          "tag_name": "baud",
+          "capture": "result"
+        }
+      ],
+      "stage": "burn",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "burn"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "CHANGE BAUDRATE COMMAND SUCCESS",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn",
+            "presentation": "CHANGE BAUDRATE COMMAND SUCCESS"
+          }
+        ],
+        "negative": [
+          {
+            "text": "CHANGE BAUDRATE COMMAND FAIL",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "burn-write-size",
+      "event_type": "command_evidence",
+      "sources": {
+        "sources": [
+          "burn_tool"
+        ],
+        "roles": [
+          "burn"
+        ]
+      },
+      "regex": "WIRITE FLASH OFFSET ADDR:(?P<addr>0x[0-9A-Fa-f]+)\\s+WRITE (?:FILE )?SIZE:\\s*(?P<size>\\d+)",
+      "presentation_capture": "size",
+      "display_captures": [
+        {
+          "tag_name": "addr",
+          "capture": "addr"
+        },
+        {
+          "tag_name": "size",
+          "capture": "size"
+        }
+      ],
+      "stage": "burn",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "burn"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "WIRITE FLASH OFFSET ADDR:0x0 WRITE FILE SIZE: 16777216",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn",
+            "presentation": "16777216",
+            "display": {
+              "addr": "0x0",
+              "size": "16777216"
+            }
+          }
+        ],
+        "negative": [
+          {
+            "text": "WIRITE FLASH SIZE: 16777216",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "burn-md5",
+      "event_type": "command_evidence",
+      "sources": {
+        "sources": [
+          "burn_tool"
+        ],
+        "roles": [
+          "burn"
+        ]
+      },
+      "regex": "MD5 CHECK SUCCESS MD5_VALUE\\s*=\\s*(?P<md5>0x[0-9A-Fa-f]+)",
+      "presentation_capture": "md5",
+      "display_captures": [
+        {
+          "tag_name": "md5",
+          "capture": "md5"
+        }
+      ],
+      "stage": "burn",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "burn"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "MD5 CHECK SUCCESS MD5_VALUE = 0x2dc44aa1d8f3c2e0dd318627a9a2fb98",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn",
+            "presentation": "0x2dc44aa1d8f3c2e0dd318627a9a2fb98"
+          }
+        ],
+        "negative": [
+          {
+            "text": "MD5 CHECK FAIL MD5_VALUE = 0x0",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "burn-flash-img",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "burn_tool"
+        ],
+        "roles": [
+          "burn"
+        ]
+      },
+      "regex": "(?P<result>FLASH DOWNLOAD SUCCESS)",
+      "presentation_capture": "result",
+      "display_captures": [
+        {
+          "tag_name": "flash",
+          "capture": "result"
+        }
+      ],
+      "stage": "burn",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "burn"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "FLASH DOWNLOAD SUCCESS",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn",
+            "presentation": "FLASH DOWNLOAD SUCCESS"
+          }
+        ],
+        "negative": [
+          {
+            "text": "FLASH DOWNLOAD FAIL",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "burn-flash-hex",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "burn_tool"
+        ],
+        "roles": [
+          "burn"
+        ]
+      },
+      "regex": "FLASH\\s+(?P<addr>0x[0-9A-Fa-f]+)\\s+SECTOR DOWNLOAD SUCCESS",
+      "presentation_capture": "addr",
+      "display_captures": [
+        {
+          "tag_name": "sector",
+          "capture": "addr"
+        }
+      ],
+      "stage": "burn",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "burn"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "FLASH 0x0 SECTOR DOWNLOAD SUCCESS",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn",
+            "presentation": "0x0"
+          }
+        ],
+        "negative": [
+          {
+            "text": "FLASH 0x0 SECTOR DOWNLOAD FAIL",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "burn-error",
+      "event_type": "device_exception",
+      "sources": {
+        "sources": [
+          "burn_tool"
+        ],
+        "roles": [
+          "burn"
+        ]
+      },
+      "regex": "(?P<reason>(?:CONNECT|FLASH|MD5|SERIAL|CHIP|BAUDRATE)[^\\r\\n]{0,80}(?:FAIL|ERROR|TIMEOUT|MISMATCH|DENIED))",
+      "presentation_capture": "reason",
+      "display_captures": [
+        {
+          "tag_name": "error",
+          "capture": "reason"
+        }
+      ],
+      "stage": "burn",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "FLASH DOWNLOAD FAIL",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn",
+            "presentation": "FLASH DOWNLOAD FAIL"
+          }
+        ],
+        "negative": [
+          {
+            "text": "FLASH DOWNLOAD SUCCESS",
+            "source": "burn_tool",
+            "port": "COM15",
+            "role": "burn"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-bootloader",
+      "event_type": "restart",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "(?P<marker>bootloader application)",
+      "presentation_capture": "marker",
+      "display_captures": [
+        {
+          "tag_name": "boot",
+          "capture": "marker"
+        }
+      ],
+      "stage": "boot_observe",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "boot_observe"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": ">>>> bootloader application >>>>",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "bootloader application"
+          }
+        ],
+        "negative": [
+          {
+            "text": "bootloader disabled",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-version",
+      "event_type": "initialization_ready",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "venus ap appliction\\((?P<version>V[^)@]+@[^)]+)\\)",
+      "presentation_capture": "version",
+      "display_captures": [
+        {
+          "tag_name": "version",
+          "capture": "version"
+        }
+      ],
+      "stage": "boot_observe",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "boot_observe"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "venus ap appliction(V4.99.8@Oct 20 2026 14:42:43)",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "V4.99.8@Oct 20 2026 14:42:43"
+          }
+        ],
+        "negative": [
+          {
+            "text": "venus ap appliction version unknown",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-build",
+      "event_type": "command_evidence",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "Project Build Info:\\s*(?P<build>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}_[0-9A-Za-z]+)",
+      "presentation_capture": "build",
+      "display_captures": [
+        {
+          "tag_name": "build",
+          "capture": "build"
+        }
+      ],
+      "stage": "boot_observe",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "boot_observe"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "Project Build Info: 2026-10-20 14:42:30_1ac783d",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "2026-10-20 14:42:30_1ac783d"
+          }
+        ],
+        "negative": [
+          {
+            "text": "Project Build Info: unavailable",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-boot-reason",
+      "event_type": "command_evidence",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "Boot Reason:\\s*(?P<booting_reason>[^\\r\\n]+)",
+      "presentation_capture": "booting_reason",
+      "display_captures": [
+        {
+          "tag_name": "boot_reason",
+          "capture": "booting_reason"
+        }
+      ],
+      "stage": "boot_observe",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "boot_observe"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "Boot Reason: POWER|HWPIN 0x03",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "POWER|HWPIN 0x03"
+          }
+        ],
+        "negative": [
+          {
+            "text": "Boot Reason unknown",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-ready",
+      "event_type": "initialization_ready",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "(?P<ready>AP Boot Ready !!!)",
+      "presentation_capture": "ready",
+      "display_captures": [
+        {
+          "tag_name": "ready",
+          "capture": "ready"
+        }
+      ],
+      "stage": "boot_observe",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "boot_observe"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[A/W:181:BOOT] AP Boot Ready !!!",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "AP Boot Ready !!!"
+          }
+        ],
+        "negative": [
+          {
+            "text": "AP Boot Not Ready",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-loglevel-ok",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "flash set log_lev:\\s*(?P<level>[0-9]+)\\s+success",
+      "presentation_capture": "level",
+      "display_captures": [
+        {
+          "tag_name": "log_lev",
+          "capture": "level"
+        }
+      ],
+      "stage": "init_command",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "init_command"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "flash set log_lev:4 success",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "4"
+          }
+        ],
+        "negative": [
+          {
+            "text": "flash write fail -1",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-loglevel-fail",
+      "event_type": "device_exception",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "(?P<reason>(?:flash write fail|cmd not found)[^\\r\\n]*)",
+      "presentation_capture": "reason",
+      "display_captures": [
+        {
+          "tag_name": "log_lev_error",
+          "capture": "reason"
+        }
+      ],
+      "stage": "init_command",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "flash write fail -1, addr 0x18ffe38d, size: 1",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "flash write fail -1, addr 0x18ffe38d, size: 1"
+          }
+        ],
+        "negative": [
+          {
+            "text": "flash set log_lev:4 success",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "control-spk-playback",
+      "event_type": "command_evidence",
+      "sources": {
+        "sources": [
+          "control"
+        ],
+        "roles": [
+          "control"
+        ]
+      },
+      "regex": "(?P<state>spk\\.uas@(?:start|stop)!!)",
+      "presentation_capture": "state",
+      "display_captures": [
+        {
+          "tag_name": "spk",
+          "capture": "state"
+        }
+      ],
+      "stage": "audio_playback",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "wake"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[A/I:1000671:_] spk.uas@start!!",
+            "source": "control",
+            "port": "COM14",
+            "role": "control",
+            "presentation": "spk.uas@start!!"
+          }
+        ],
+        "negative": [
+          {
+            "text": "spk.uas@play!!",
+            "source": "control",
+            "port": "COM14",
+            "role": "control"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-language-ok",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "(?P<result>algo_lang switch to 0 success)",
+      "presentation_capture": "result",
+      "display_captures": [
+        {
+          "tag_name": "lang",
+          "capture": "result"
+        }
+      ],
+      "stage": "init_command",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "init_command"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[2022-10-01 12:00:05.450][I][evs_event # ALGO_LANG] [algo_lang_switch_end:339] algo_lang switch to 0 success",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "algo_lang switch to 0 success"
+          }
+        ],
+        "negative": [
+          {
+            "text": "algo switch failed",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-wake",
+      "event_type": "wake_result",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "(?P<wake>start local wakeup|keyword:HELLO HAIER|algo pre wakeup info|wakeup_response_id\\s*=\\s*\\d+)",
+      "presentation_capture": "wake",
+      "display_captures": [
+        {
+          "tag_name": "wake",
+          "capture": "wake"
+        }
+      ],
+      "stage": "wake",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "wake"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[2022-10-01 12:08:15.270][W][evs_event # client] [_client_wakeup_callback:374] start local wakeup",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "start local wakeup"
+          }
+        ],
+        "negative": [
+          {
+            "text": "not wakeup, ignore this local asr",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-asr-command",
+      "event_type": "offline_result",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "keyword:(?P<keyword>Turn down volume)",
+      "presentation_capture": "keyword",
+      "display_captures": [
+        {
+          "tag_name": "asr",
+          "capture": "keyword"
+        }
+      ],
+      "stage": "command",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "command"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[2022-10-01 12:21:29.720][W][evs_event # algo] [evs_algo_vir_kid_extract:150] keyword:Turn down volume",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "Turn down volume"
+          }
+        ],
+        "negative": [
+          {
+            "text": "keyword:HELLO HAIER",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-volume-response",
+      "event_type": "command_ack",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "refresh volume from\\s+(?P<before>\\d+)\\s+to\\s+(?P<after>\\d+)",
+      "presentation_capture": "after",
+      "display_captures": [
+        {
+          "tag_name": "volume_from",
+          "capture": "before"
+        },
+        {
+          "tag_name": "volume_to",
+          "capture": "after"
+        }
+      ],
+      "stage": "command_response",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [
+        "command_response"
+      ],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "[2022-10-01 12:21:29.760][I][evs_event # proj_cfg] refresh volume from 80 to 70",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "70",
+            "display": {
+              "volume_from": "80",
+              "volume_to": "70"
+            }
+          }
+        ],
+        "negative": [
+          {
+            "text": "refresh volume failed",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "csk-fatal",
+      "event_type": "device_exception",
+      "sources": {
+        "sources": [
+          "csk"
+        ],
+        "roles": [
+          "csk"
+        ]
+      },
+      "regex": "(?P<reason>FATAL|ASSERT FAIL|HardFault|panic|watchdog reset|Stack overflow|Boot Reason:\\s*CRASH|CSK AP Ready after exception)",
+      "presentation_capture": "reason",
+      "display_captures": [
+        {
+          "tag_name": "fatal",
+          "capture": "reason"
+        }
+      ],
+      "stage": "boot_observe",
+      "correlation": {},
+      "mirror_policy": "distinct",
+      "required_for": [],
+      "empty_placeholder": "",
+      "fixtures": {
+        "positive": [
+          {
+            "text": "FATAL: system halted",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk",
+            "presentation": "FATAL"
+          }
+        ],
+        "negative": [
+          {
+            "text": "[E][rx_task # SPI_PROT] type=3 not find",
+            "source": "csk",
+            "port": "COM13",
+            "role": "csk"
+          }
+        ]
+      }
+    }
+  ]
+}

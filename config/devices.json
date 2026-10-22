@@ -1,0 +1,85 @@
+{
+  "_note": "8 台 ListenAI 板卡，按用户最新 18 设备清单映射：control=VCOM，csk=CH344 A，burn=B，hisi=C，D 暂不使用。",
+  "devices": [
+    {
+      "id": "dev01",
+      "label": "8-1",
+      "control": "COM27",
+      "csk": "COM26",
+      "burn": "COM28",
+      "hisi": "COM29",
+      "render_device_key": "VID_8765&PID_5678:9_1E8AF907_0_0000",
+      "enabled": true
+    },
+    {
+      "id": "dev02",
+      "label": "8-2",
+      "control": "COM23",
+      "csk": "COM19",
+      "burn": "COM22",
+      "hisi": "COM21",
+      "render_device_key": "VID_8765&PID_5678:9_1CB89118_0_0000",
+      "enabled": true
+    },
+    {
+      "id": "dev03",
+      "label": "8-3",
+      "control": "COM54",
+      "csk": "COM56",
+      "burn": "COM57",
+      "hisi": "COM55",
+      "render_device_key": "VID_8765&PID_5678:8_318EBAB9_1_0000",
+      "enabled": true
+    },
+    {
+      "id": "dev04",
+      "label": "8-4",
+      "control": "COM38",
+      "csk": "COM35",
+      "burn": "COM36",
+      "hisi": "COM39",
+      "render_device_key": "VID_8765&PID_5678:9_20F75A24_0_0000",
+      "enabled": true
+    },
+    {
+      "id": "dev05",
+      "label": "8-5",
+      "control": "COM11",
+      "csk": "COM10",
+      "burn": "COM24",
+      "hisi": "COM9",
+      "render_device_key": "VID_8765&PID_5678:9_E73EA4D_0_0000",
+      "enabled": true
+    },
+    {
+      "id": "dev06",
+      "label": "8-6",
+      "control": "COM7",
+      "csk": "COM4",
+      "burn": "COM6",
+      "hisi": "COM5",
+      "render_device_key": "VID_8765&PID_5678:9_336E9D69_0_0000",
+      "enabled": true
+    },
+    {
+      "id": "dev07",
+      "label": "8-7",
+      "control": "COM44",
+      "csk": "COM41",
+      "burn": "COM43",
+      "hisi": "COM42",
+      "render_device_key": "VID_8765&PID_5678:9_EAB4692_0_0000",
+      "enabled": true
+    },
+    {
+      "id": "dev08",
+      "label": "8-8",
+      "control": "COM14",
+      "csk": "COM13",
+      "burn": "COM15",
+      "hisi": "COM18",
+      "render_device_key": "VID_8765&PID_5678:9_2A847557_0_0000",
+      "enabled": true
+    }
+  ]
+}

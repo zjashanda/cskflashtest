@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "chip_type": "0x60120001",
+  "firmware": {
+    "img": {
+      "path": "burn/fw.img",
+      "source_sha256": "b9f8c2ece3c9396a312a8c470e45e80bd3a6ef14fb34e4987dc1cda238135dc5",
+      "expected_tool_md5": "2dc44aa1d8f3c2e0dd318627a9a2fb98",
+      "expected_write_size": 16777216,
+      "expected_version": "V4.99.8",
+      "expected_build": "2026-10-20 14:42:30_1ac783d"
+    },
+    "hex": {
+      "path": "fw/V46.99.8_20261020144346/CSK/fw.hex",
+      "source_sha256": "ff78e9b0414f2d2ca8ed456463ebb4062a7966a846fa3d443a3e7a53af428931",
+      "expected_tool_md5": "f6d6369435d52784efe1119ebd08f582",
+      "expected_write_size": 5685248,
+      "expected_version": "V4.99.8",
+      "expected_build": "2026-10-20 14:42:30_1ac783d"
+    }
+  },
+  "timing": {
+    "command_gap_s": 0.5,
+    "pre_burn_wait_s": 1.0,
+    "post_burn_gap_s": 0.5,
+    "boot_observe_timeout_s": 30.0,
+    "post_ready_settle_s": 2.0,
+    "burn_timeout_s": 600.0,
+    "control_ack_timeout_s": 2.0,
+    "control_retries": 2,
+    "csk_init_wait_s": 2.0
+  },
+  "csk_init": {
+    "command": "flash.setloglev 4",
+    "success_pattern": "flash set log_lev:4 success",
+    "retries": 5,
+    "attempt_timeout_s": 3.0,
+    "attempt_gap_s": 0.8
+  },
+  "audio_init": {
+    "commands": [
+      "uut-pa.on",
+      "pa-enable.set 0 17 0 1"
+    ],
+    "verify_command": "pa-enable.show",
+    "verify_pattern": "PA Enable:",
+    "retries": 2
+  },
+  "wake": {
+    "audio_file": "wav/Wake/hellohaier.wav",
+    "render_device_key": "VID_8765&PID_5678:9_2A847557_0_0000",
+    "language_command": "algo.switch.lang 0",
+    "language_success_pattern": "algo_lang switch to 0 success",
+    "language_timeout_s": 20.0,
+    "playback_timeout_s": 12.0,
+    "post_switch_settle_s": 3.0,
+    "attempts": 5,
+    "playback_start_pattern": "spk.uas@start!!",
+    "playback_stop_pattern": "spk.uas@stop!!",
+    "wake_patterns": [
+      "start local wakeup",
+      "keyword:HELLO HAIER",
+      "algo pre wakeup info",
+      "wakeup_response_id"
+    ]
+  },
+  "interaction": {
+    "audio_file": "wav/Turn-down-volume/Turn down volume_norm.wav",
+    "expected_keyword": "Turn down volume",
+    "expected_vir_kid": 78,
+    "min_volume": 40,
+    "command_timeout_s": 10.0,
+    "asr_pattern": "keyword:(?P<keyword>[^\\\"\\r\\n]+)",
+    "volume_pattern": "refresh volume from\\s+(?P<before>\\d+)\\s+to\\s+(?P<after>\\d+)",
+    "pre_command_volume": 80,
+    "volume_direction": "decrease",
+    "attempts": 5
+  },
+  "ports": {
+    "control": {
+      "port": "COM14",
+      "baudrate": 115200
+    },
+    "csk": {
+      "port": "COM13",
+      "baudrate": 115200
+    },
+    "burn": {
+      "port": "COM15",
+      "baudrate": 115200
+    },
+    "hisi": {
+      "port": "COM18",
+      "baudrate": 1500000
+    }
+  },
+  "verification": {
+    "min_free_bytes": 1073741824,
+    "max_bootloader_count": 5,
+    "require_md5_match": true,
+    "require_write_size": true,
+    "require_version": true,
+    "require_build": true,
+    "require_ap_ready": true,
+    "require_no_fatal": true
+  },
+  "audio_lock": {
+    "slots": 4,
+    "stale_after_s": 300,
+    "wait_timeout_s": 1800
+  }
+}
