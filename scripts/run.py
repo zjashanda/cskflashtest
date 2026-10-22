@@ -27,6 +27,7 @@ from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = SKILL_ROOT.parent
+sys.path.insert(0, str(SKILL_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 

@@ -37,7 +37,7 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 - `wav/Turn-down-volume/Turn down volume_norm.wav`：交互命令词；
 - `wav/` 下的完整意图语料，供命令词扫描使用。
 
-公共框架 `lstest` 不复制进本仓库；运行时需将 `lstest` 放在项目根目录（与本 Skill 同级），脚本通过 `lstest.scripts` 调用公共运行时和播放器。
+本仓库已内置运行所需的 `lstest/scripts` 公共运行时；完整 `lstest` 测试和文档不包含。若项目根目录另有 `lstest`，脚本优先使用项目根目录版本。
 
 ## 快速开始
 

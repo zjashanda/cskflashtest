@@ -71,8 +71,12 @@ def parse_hex(path: Path) -> tuple[int, str]:
 
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
+    skill_root = Path(__file__).resolve().parents[1]
+    default_manifest = root / "cskflashtest" / "config" / "firmware-manifest.json"
+    if not default_manifest.exists():
+        default_manifest = skill_root / "config" / "firmware-manifest.json"
     parser = argparse.ArgumentParser()
-    parser.add_argument("--manifest", default=str(root / "cskflashtest" / "config" / "firmware-manifest.json"))
+    parser.add_argument("--manifest", default=str(default_manifest))
     parser.add_argument("--key", choices=("img", "hex"), required=True)
     parser.add_argument("--fw", default="")
     parser.add_argument("--tool-md5", default="")
@@ -87,6 +91,12 @@ def main() -> int:
     fw_path = Path(args.fw) if args.fw else root / entry["path"]
     if not fw_path.is_absolute():
         fw_path = root / fw_path
+    if args.fw and not fw_path.exists():
+        fw_path = skill_root / args.fw
+    if not fw_path.exists():
+        fallback = skill_root / entry["path"]
+        if fallback.exists():
+            fw_path = fallback
     if not fw_path.is_file():
         raise SystemExit(f"firmware not found: {fw_path}")
 

@@ -22,6 +22,8 @@ SUMMARY = WORK / "summary.txt"
 KEY = "VID_8765&PID_5678:9_2A847557_0_0000"
 WAKE = str(WAV_DIR / "Wake" / "hellohaier.wav")
 PLAY = ROOT / "lstest" / "scripts" / "listenai_play.py"
+if not PLAY.exists():
+    PLAY = SKILL_ROOT / "lstest" / "scripts" / "listenai_play.py"
 
 
 def audio_files(folder):

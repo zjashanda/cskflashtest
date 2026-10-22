@@ -1,5 +1,5 @@
 @echo off
 setlocal
-cd /d "%~dp0.."
-python -u cskflashtest\scripts\run_multi.py --devices cskflashtest\config\devices.json %*
+cd /d "%~dp0"
+python -u scripts\run_multi.py --devices config\devices.json %*
 if errorlevel 1 pause
