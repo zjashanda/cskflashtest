@@ -125,6 +125,17 @@ def load_device_entry(path: Path, device_id: str | None) -> dict:
     return devices[0]
 
 
+def asset_path(relative: Path) -> Path:
+    """Resolve an asset under the project first, then under the skill repo."""
+    if relative.is_absolute():
+        return relative
+    for base in (PROJECT_ROOT, SKILL_ROOT):
+        candidate = base / relative
+        if candidate.exists():
+            return candidate
+    return PROJECT_ROOT / relative
+
+
 def find_evidence(events: list[LineEvent], pattern: re.Pattern[str]) -> list[str]:
     result: list[str] = []
     for event in events:
@@ -180,11 +191,10 @@ class BurnScenario:
         self.fw_key = fw_key
         entry = dict(self.manifest["firmware"][fw_key])
         self.fw_entry = entry
-        self.fw_path = PROJECT_ROOT / entry["path"]
         if raw_fw not in ("auto", "img", "hex"):
-            self.fw_path = Path(args.fw)
-        if not self.fw_path.is_absolute():
-            self.fw_path = PROJECT_ROOT / self.fw_path
+            self.fw_path = asset_path(Path(args.fw))
+        else:
+            self.fw_path = asset_path(Path(entry["path"]))
 
         self.control_port = str(self.ports["control"]["port"])
         self.csk_port = str(self.ports["csk"]["port"])
@@ -253,7 +263,7 @@ class BurnScenario:
                 if expected_size and size != expected_size:
                     errors.append(f"hex write size mismatch: {size} != {expected_size}")
 
-        tool = PROJECT_ROOT / "burn" / "Uart_Burn_Tool.exe"
+        tool = asset_path(Path("burn") / "Uart_Burn_Tool.exe")
         if not tool.is_file():
             errors.append(f"burn tool missing: {tool}")
 
@@ -509,7 +519,7 @@ class BurnScenario:
         wake_patterns = [re.compile(str(item), re.I) for item in self.wake.get("wake_patterns", []) if str(item)]
         wake_cursor = self.csk.snapshot()
         control_cursor = self.control.snapshot()
-        play_file = PROJECT_ROOT / str(self.wake.get("audio_file", "wav/Wake/hellohaier.wav"))
+        play_file = asset_path(Path(str(self.wake.get("audio_file", "wav/Wake/hellohaier.wav"))))
         play_key = str(self.wake.get("render_device_key", ""))
         proc = subprocess.Popen(
             [sys.executable, "-u", str(PROJECT_ROOT / "lstest" / "scripts" / "listenai_play.py"),
@@ -587,7 +597,7 @@ class BurnScenario:
         for attempt in range(1, attempts + 1):
             play_cursor = self.csk.snapshot()
             control_cursor = self.control.snapshot()
-            play_file = PROJECT_ROOT / str(self.wake.get("audio_file", "wav/Wake/hellohaier.wav"))
+            play_file = asset_path(Path(str(self.wake.get("audio_file", "wav/Wake/hellohaier.wav"))))
             play_key = str(self.wake.get("render_device_key", ""))
             command = [
                 sys.executable, "-u", str(PROJECT_ROOT / "lstest" / "scripts" / "listenai_play.py"),
@@ -701,7 +711,7 @@ class BurnScenario:
                     continue
             play_cursor = self.csk.snapshot()
             control_cursor = self.control.snapshot()
-            play_file = PROJECT_ROOT / str(cfg.get("audio_file", "wav/Turn-down-volume/Turn down volume_norm.wav"))
+            play_file = asset_path(Path(str(cfg.get("audio_file", "wav/Turn-down-volume/Turn down volume_norm.wav"))))
             play_key = str(self.wake.get("render_device_key", ""))
             command = [
                 sys.executable, "-u", str(PROJECT_ROOT / "lstest" / "scripts" / "listenai_play.py"),
@@ -833,9 +843,10 @@ class BurnScenario:
             on_event=self.dispatch, on_error=self.on_serial_error,
         )
         self.burn_log.open_log_only()
+        burn_tool = asset_path(Path("burn") / "Uart_Burn_Tool.exe")
         self.burn_runner = BurnToolRunner(
-            PROJECT_ROOT / "burn" / "Uart_Burn_Tool.exe",
-            PROJECT_ROOT / "burn",
+            burn_tool,
+            burn_tool.parent,
             self.burn_log,
             on_error=self.on_serial_error,
         )

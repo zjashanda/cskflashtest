@@ -10,7 +10,8 @@ import numpy as np
 import serial
 
 ROOT = Path(__file__).resolve().parents[2]
-WAV_DIR = ROOT / "wav"
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+WAV_DIR = ROOT / "wav" if (ROOT / "wav").is_dir() else SKILL_ROOT / "wav"
 WORK = ROOT / "logs" / "command_scan"
 NORM = WORK / "norm"
 RAW = WORK / "raw"

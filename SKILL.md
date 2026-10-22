@@ -26,6 +26,19 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 | 固件清单 | `config/firmware-manifest.json` | 固件路径、SHA-256、预期 MD5、写入大小、版本、构建号 |
 | 日志 profile | `config/burn-profile.json` | 控制回执、烧录旁证、CSK 启动事实的正则合同 |
 
+## 附带资源
+
+仓库已包含运行所需资源：
+
+- `burn/Uart_Burn_Tool.exe`：CSK 烧录工具；
+- `burn/fw.img`：整镜像固件；
+- `fw/V46.99.8_20261020144346/CSK/fw.hex`：hex 固件；
+- `wav/Wake/hellohaier.wav`：唤醒词；
+- `wav/Turn-down-volume/Turn down volume_norm.wav`：交互命令词；
+- `wav/` 下的完整意图语料，供命令词扫描使用。
+
+公共框架 `lstest` 不复制进本仓库；运行时需将 `lstest` 放在项目根目录（与本 Skill 同级），脚本通过 `lstest.scripts` 调用公共运行时和播放器。
+
 ## 快速开始
 
 ```powershell
