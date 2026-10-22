@@ -39,6 +39,13 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 
 本仓库已内置运行所需的 `lstest/scripts` 公共运行时；完整 `lstest` 测试和文档不包含。若项目根目录另有 `lstest`，脚本优先使用项目根目录版本。
 
+## 环境准备
+
+- Windows + Python 3.10+；
+- 首次运行执行 `install_requirements.bat`，或 `python -m pip install -r requirements.txt`；
+- 需要 FFmpeg 用于音频转换，`tts` 需要 `edge-tts`，播放需要 `pygame`，串口需要 `pyserial`；
+- 设备信息只需修改 `config/devices.json`，其余脚本、音频、烧录工具、固件和内置 `lstest/scripts` 已随仓库提供。
+
 ## 快速开始
 
 ```powershell
