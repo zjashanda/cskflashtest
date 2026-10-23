@@ -78,6 +78,9 @@
     "response_playback_patterns": ["offline_tts_callback", "soundplayer"],
     "attempts": 4
   },
+  "interaction_acceptance": {
+    "mode": "any_asr"
+  },
   "ports": {
     "control": {
       "port": "COM14",

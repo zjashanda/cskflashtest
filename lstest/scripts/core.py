@@ -358,6 +358,7 @@ class TaskArtifacts:
         self._legacy_stdout_disabled = False
         self.timeline = TimelineLedger(self._append_timeline_line, now_human)
         result_fields = list(dict.fromkeys([*self.RESULT_FIELDS, *detail_fields]))
+        self.detail_fields = list(detail_fields)
         results_exist = append and self.results_path.exists() and self.results_path.stat().st_size > 0
         cases_exist = append and self.cases_path.exists() and self.cases_path.stat().st_size > 0
         self._csv = self.results_path.open("a" if results_exist else "w", encoding="utf-8-sig", newline="")
@@ -1350,6 +1351,8 @@ class TaskArtifacts:
                 "evidence": self._join_codes(result.evidence),
                 "facts_json": json.dumps(facts, ensure_ascii=False, sort_keys=True, default=str),
             }
+            for name in self.detail_fields:
+                row[name] = facts.get(name, "")
             self._writer.writerow({name: self._csv_value(value) for name, value in row.items()})
             self._csv.flush()
         self._record_round_exception_summary(result.case_id, status)

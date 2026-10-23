@@ -241,26 +241,43 @@ python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json
 wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav
 ```
 
-ASR 结果按三态判定：
+单轮交互结果统一为四种：
 
-- `correct`：命中 `keyword:Turn on aircon`，PASS；
-- `misrecognized`：有 `keyword:` 结果但不是 `Turn on aircon`（例如 `Turn on ECO`），PASS，仅记录误识别，不重试；
-- `no_result`：完全没有 `keyword:` 结果，FAIL，允许重新唤醒后再识别。
+- `hit`：唤醒成功，识别到目标词 `Turn on aircon`；
+- `misheard`：唤醒成功，有识别结果但不是目标词（例如 `Turn on ECO`）；
+- `empty`：唤醒成功，但没有识别结果；
+- `asleep`：未唤醒。
+
+验收模式通过 `--acceptance` 选择（默认 `any_asr`）：
+
+| 模式 | 唤醒 | 唤醒播报 | ASR 结果 | 识别响应/播报 |
+|---|---|---|---|---|
+| `wake_only` | 要求 | 不检查 | 不检查 | 不检查 |
+| `wake_playback` | 要求 | 至少 1 次完整播报 | 不检查 | 不检查 |
+| `strict` | 要求 | 不检查 | 只接受 `hit` | 不检查 |
+| `strict_playback` | 要求 | 至少 1 次完整播报 | 只接受 `hit` | 要求响应 + 至少 1 次完整播报 |
+| `any_asr` | 要求 | 不检查 | `hit` / `misheard` | 不检查 |
+| `any_asr_playback` | 要求 | 至少 1 次完整播报 | `hit` / `misheard` | 要求响应 + 至少 1 次完整播报 |
+| `asr_optional` | 要求 | 不检查 | `hit` / `misheard` / `empty`；整轮任务至少一次非空 | 不检查 |
+| `asr_optional_playback` | 要求 | 至少 1 次完整播报 | `hit` / `misheard` / `empty`；整轮任务至少一次非空 | 有识别结果的轮次要求响应 + 至少 1 次完整播报 |
 
 规则：
 
-- 每轮只要求一次成功唤醒 + 一次识别结果；
+- 以上都是**单轮交互**判定；`asr_optional` 的“至少一次非空”是额外的任务级约束；
+- 唤醒播报默认按 1 次检查；
+- 识别播报允许多次，每次要求 PLAYING → COMPLETE 或 start → stop；
 - 唤醒失败或无识别结果才重试，最多 4 次（首次 + 3 次重试）；
 - 误识别不重试；
-- 不再校验音量变化，`vir_kid` 仅记录。
+- 不再校验音量变化，`vir_kid` 仅记录；
+- 上下电测试默认使用 `any_asr`。
 
 命令：
 
 ```powershell
-python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json --device-id dev01 --rounds 1 --skip-burn --wake-test --interaction-test --no-hisi
+python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json --device-id dev01 --rounds 1 --skip-burn --acceptance any_asr --no-hisi
 ```
 
-`--interaction-test` 会自动启用唤醒测试；多设备时加 `--interaction-test`，并为每台设备配置自己的 `render_device_key`。
+`--acceptance strict/any_asr/asr_optional/strict_playback/any_asr_playback/asr_optional_playback` 会自动启用唤醒和 ASR；`--acceptance wake_only/wake_playback` 只验证唤醒。多设备时每台设备仍需配置自己的 `render_device_key`。
 
 ## 压测前初始化清理
 

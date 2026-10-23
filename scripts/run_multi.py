@@ -31,6 +31,7 @@ from lstest.scripts.environment_cleanup import (  # noqa: E402
     cleanup_temp_files,
     kill_processes_by_command,
 )
+from lstest.scripts.interaction_acceptance import MODES  # noqa: E402
 
 
 def now_human() -> str:
@@ -153,6 +154,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-hisi", action="store_true")
     parser.add_argument("--wake-test", action="store_true", help="每轮初始化后切换英文并验证唤醒")
     parser.add_argument("--interaction-test", action="store_true", help="唤醒后播报命令词并校验 ASR/响应")
+    parser.add_argument("--acceptance", choices=sorted(MODES), default="",
+                        help="单轮交互验收模式：strict/any_asr/asr_optional/wake_only")
     parser.add_argument("--result-root", default=str(SKILL_ROOT / "result"))
     parser.add_argument("--summary-dir", default="")
     parser.add_argument("--dry-run", action="store_true", help="只校验设备和端口配置，不启动烧录")
@@ -233,6 +236,8 @@ def main() -> int:
                     cmd += ["--wake-test"]
                 if args.interaction_test:
                     cmd += ["--interaction-test"]
+                if args.acceptance:
+                    cmd += ["--acceptance", args.acceptance]
                 started = time.monotonic()
                 try:
                     process = subprocess.Popen(

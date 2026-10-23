@@ -547,7 +547,50 @@ def require_ffmpeg() -> str:
     return require_executable("ffmpeg")
 
 
+def normalize_wav_python(source: Path, target: Path) -> None:
+    """把 16-bit PCM WAV 转为目标格式，避免依赖外部 ffmpeg。"""
+    import numpy as np
+
+    with wave.open(str(source), "rb") as handle:
+        channels = handle.getnchannels()
+        width = handle.getsampwidth()
+        rate = handle.getframerate()
+        frames = handle.readframes(handle.getnframes())
+    if width != 2:
+        raise ValueError(f"unsupported WAV sample width: {width}")
+    data = np.frombuffer(frames, dtype="<i2").astype(np.float32)
+    if channels > 1:
+        data = data.reshape(-1, channels).mean(axis=1)
+    if rate != TARGET_RATE:
+        length = len(data)
+        if length == 0:
+            raise ValueError("empty WAV")
+        duration = length / rate
+        new_length = max(1, int(round(duration * TARGET_RATE)))
+        old_pos = np.linspace(0.0, 1.0, length, endpoint=False)
+        new_pos = np.linspace(0.0, 1.0, new_length, endpoint=False)
+        data = np.interp(new_pos, old_pos, data)
+    data = np.clip(data, -32768, 32767).astype("<i2")
+    if TARGET_CHANNELS == 2:
+        output = np.column_stack([data, data])
+    elif TARGET_CHANNELS == 1:
+        output = data
+    else:
+        raise ValueError(f"unsupported target channels: {TARGET_CHANNELS}")
+    with wave.open(str(target), "wb") as handle:
+        handle.setnchannels(TARGET_CHANNELS)
+        handle.setsampwidth(2)
+        handle.setframerate(TARGET_RATE)
+        handle.writeframes(output.tobytes())
+
+
 def normalize_audio(source: Path, target: Path) -> None:
+    if source.suffix.lower() == ".wav":
+        try:
+            normalize_wav_python(source, target)
+            return
+        except Exception:
+            pass
     ffmpeg_bin = require_ffmpeg()
     result = run_command(
         [

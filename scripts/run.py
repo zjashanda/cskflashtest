@@ -33,6 +33,12 @@ sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
 from lstest.scripts.core import CaseResult, TaskArtifacts  # noqa: E402
 from lstest.scripts.profile import DeviceProfile, ProfileFixtureRunner, RawLogRecord  # noqa: E402
+from lstest.scripts.interaction_acceptance import (  # noqa: E402
+    MODES,
+    evaluate_round,
+    evaluate_run,
+    mode_label,
+)
 from lstest.scripts.runtime import ScenarioRuntime  # noqa: E402
 from lstest.scripts.serial_recovery import recover_serial  # noqa: E402
 from lstest.scripts.timeline import ToolLogValidator  # noqa: E402
@@ -174,6 +180,16 @@ class BurnScenario:
         self.profile = DeviceProfile.load(self.profile_path)
         self.timing = dict(self.manifest.get("timing", {}))
         self.control_recovery = dict(self.manifest.get("control_recovery", {}))
+        self.acceptance_mode = str(
+            getattr(args, "acceptance", "")
+            or self.manifest.get("interaction_acceptance", {}).get("mode", "any_asr")
+        ).strip()
+        if self.acceptance_mode not in MODES:
+            raise ValueError(f"unsupported acceptance mode: {self.acceptance_mode}")
+        if getattr(args, "acceptance", ""):
+            args.wake_test = True
+            args.interaction_test = self.acceptance_mode not in {"wake_only", "wake_playback"}
+        self._asr_result_seen = False
         self.verification = dict(self.manifest.get("verification", {}))
         self.ports = dict(self.manifest.get("ports", {}))
         self.device_id = ""
@@ -370,6 +386,7 @@ class BurnScenario:
         self.artifacts = TaskArtifacts(
             self.result_root,
             self.task_slug,
+            detail_fields=("round_outcome", "acceptance_mode", "asr_skipped"),
             run_name=self.run_name,
             append=True,
         )
@@ -732,11 +749,15 @@ class BurnScenario:
             has_wake = any(pattern.search(csk_text) for pattern in wake_patterns)
             reset = "bootloader application" in csk_text
             playback_observed = has_start or (not self.require_spk_marker and has_miniplayer)
+            playback_count = control_text.count(start_pattern) or csk_text.count("miniplayer status: PLAYING")
+            playback_complete = (stop_pattern in control_text) or ("miniplayer status: COMPLETE" in csk_text)
             details["attempts"].append({
                 "attempt": attempt,
                 "playback_start": has_start,
                 "playback_stop": has_stop,
                 "playback_csk": has_miniplayer,
+                "playback_count": playback_count,
+                "playback_complete": playback_complete,
                 "wake": has_wake,
                 "reset": reset,
                 "play_output": play_output[-500:],
@@ -774,6 +795,12 @@ class BurnScenario:
         details["failed_attempts"] = failed_attempts
         details["max_attempts"] = attempts
         details["success"] = bool(playback_ok and wake_ok and language_ok)
+        successful = next(
+            (item for item in reversed(details["attempts"]) if item.get("wake") and not item.get("reset")),
+            {},
+        )
+        details["wake_playback_count"] = int(successful.get("playback_count", 0) or 0)
+        details["wake_playback_complete"] = bool(successful.get("playback_complete", False))
         if not language_ok:
             last_reason = "英文切换未确认: " + language_text[-200:]
         if not details["success"]:
@@ -858,7 +885,7 @@ class BurnScenario:
             keyword_present = bool(actual_keyword)
             keyword_correct = bool(expected) and expected.lower() in actual_keyword.lower()
             misrecognized = keyword_present and not keyword_correct
-            outcome = "correct" if keyword_correct else ("misrecognized" if misrecognized else "no_result")
+            outcome = "hit" if keyword_correct else ("misheard" if misrecognized else "empty")
             kid_match = re.search(r"vir_kid:\s*(\d+)", csk_text)
             response_ok = False
             if keyword_correct:
@@ -871,10 +898,26 @@ class BurnScenario:
                 keyword_present = False
                 keyword_correct = False
                 misrecognized = False
-                outcome = "no_result"
+                outcome = "empty"
                 response_ok = False
 
             start_ok = "spk.uas@start!!" in control_text
+            asr_response_count = 0
+            asr_playback_count = 0
+            asr_playback_complete = False
+            if keyword_present:
+                kw_event_idx = max(
+                    i for i, item in enumerate(csk_events)
+                    if "keyword:" in item.text and "HELLO HAIER" not in item.text
+                )
+                tail_text = "\n".join(item.text for item in csk_events[kw_event_idx + 1:])
+                asr_response_count = tail_text.count("offline_tts_callback")
+                if not asr_response_count:
+                    asr_response_count = sum(
+                        1 for pattern in response_patterns for _ in pattern.finditer(tail_text)
+                    )
+                asr_playback_count = tail_text.count("miniplayer status: PLAYING")
+                asr_playback_complete = "miniplayer status: COMPLETE" in tail_text
             attempt_ok = keyword_present and not reset
             details["attempts"].append({
                 "attempt": attempt,
@@ -884,6 +927,9 @@ class BurnScenario:
                 "misrecognized": misrecognized,
                 "outcome": outcome,
                 "response_ok": response_ok,
+                "asr_response_count": asr_response_count,
+                "asr_playback_count": asr_playback_count,
+                "asr_playback_complete": asr_playback_complete,
                 "keyword": actual_keyword,
                 "vir_kid": int(kid_match.group(1)) if kid_match else None,
                 "reset": reset,
@@ -912,7 +958,10 @@ class BurnScenario:
             if not (item.get("keyword_ok") and not item.get("reset"))
         )
         last = details["attempts"][-1] if details["attempts"] else {}
-        outcome = last.get("outcome", "no_result")
+        outcome = last.get("outcome", "empty")
+        details["asr_response_count"] = int(last.get("asr_response_count", 0) or 0)
+        details["asr_playback_count"] = int(last.get("asr_playback_count", 0) or 0)
+        details["asr_playback_complete"] = bool(last.get("asr_playback_complete", False))
         reason = (
             f"ASR={expected}, attempts={len(details['attempts'])}/{attempts}, "
             f"result={outcome}, actual={last.get('keyword') or '-'}, reset={last.get('reset')}"
@@ -1024,6 +1073,8 @@ class BurnScenario:
         init_ok = False
         wake_details: dict = {}
         interaction_details: dict = {}
+        round_outcome = "empty"
+        asr_skipped = self.acceptance_mode in {"wake_only", "wake_playback"}
         burn_result = None
         burn_events: list[LineEvent] = []
         boot_events: list[LineEvent] = []
@@ -1284,14 +1335,32 @@ class BurnScenario:
                         status="PASS" if wake_ok else "FAIL",
                         raw={"wake_failures": wake_failures, "max_attempts": max_attempts},
                     )
+
+                    def acceptance():
+                        return evaluate_round(
+                            round_outcome,
+                            self.acceptance_mode,
+                            wake_playback_count=int(wake_details.get("wake_playback_count", 0) or 0),
+                            wake_playback_complete=bool(wake_details.get("wake_playback_complete", False)),
+                            asr_response_count=int(interaction_details.get("asr_response_count", 0) or 0),
+                            asr_playback_count=int(interaction_details.get("asr_playback_count", 0) or 0),
+                            asr_playback_complete=bool(interaction_details.get("asr_playback_complete", False)),
+                        )
+
                     if self.args.interaction_test:
                         min_volume = int(self.interaction.get("min_volume", 40))
                         if not wake_ok:
                             interaction_details = {"skipped": "wake_failed"}
+                            round_outcome = "asleep"
                             self._emit(
                                 "SYSTEM", "INTERACTION_SKIPPED",
                                 "唤醒未成功，跳过命令词识别",
                                 case_id=case_id, status="FAIL", raw=interaction_details,
+                            )
+                            accepted, accept_reason = acceptance()
+                            add_check(
+                                "interaction_acceptance", accepted, accept_reason, [],
+                                outcome=round_outcome, mode=self.acceptance_mode,
                             )
                         elif current_volume is not None and current_volume <= min_volume:
                             interaction_details = {
@@ -1310,22 +1379,46 @@ class BurnScenario:
                                 case_id=case_id, status="PASS", raw=interaction_details,
                             )
                         else:
-                            keyword_ok, response_ok, interaction_reason, interaction_evidence, interaction_details = self.run_interaction_test()
-                            add_check("asr_keyword", keyword_ok, interaction_reason, interaction_evidence)
-                            self._emit(
-                                "SYSTEM", "ASR_RESPONSE",
-                                f"识别播报={'已观察到' if response_ok else '未观察到（仅记录）'}",
-                                case_id=case_id,
-                                status="PASS" if response_ok else "WARN",
-                                raw={"response_ok": response_ok},
+                            if self.acceptance_mode in {"wake_only", "wake_playback"}:
+                                asr_skipped = True
+                                round_outcome = "empty"
+                                self._emit(
+                                    "SYSTEM", "INTERACTION_SKIPPED",
+                                    "wake_only 验收，跳过 ASR",
+                                    case_id=case_id, status="SKIP",
+                                )
+                            else:
+                                keyword_ok, response_ok, interaction_reason, interaction_evidence, interaction_details = self.run_interaction_test()
+                                attempts = interaction_details.get("attempts", []) if interaction_details else []
+                                round_outcome = str(attempts[-1].get("outcome", "empty")) if attempts else "empty"
+                                if round_outcome in {"hit", "misheard"}:
+                                    self._asr_result_seen = True
+                                self._emit(
+                                    "SYSTEM", "ASR_RESPONSE",
+                                    f"识别播报={'已观察到' if response_ok else '未观察到（仅记录）'}",
+                                    case_id=case_id,
+                                    status="PASS" if response_ok else "WARN",
+                                    raw={"response_ok": response_ok},
+                                )
+                                self._emit(
+                                    "SYSTEM", "INTERACTION_RESULT",
+                                    interaction_reason,
+                                    case_id=case_id,
+                                    status="PASS" if round_outcome in {"hit", "misheard"} else "FAIL",
+                                    raw=interaction_details,
+                                )
+                            accepted, accept_reason = acceptance()
+                            add_check(
+                                "interaction_acceptance", accepted, accept_reason, [],
+                                outcome=round_outcome, mode=self.acceptance_mode,
                             )
-                            self._emit(
-                                "SYSTEM", "INTERACTION_RESULT",
-                                interaction_reason,
-                                case_id=case_id,
-                                status="PASS" if keyword_ok else "FAIL",
-                                raw=interaction_details,
-                            )
+                    if self.acceptance_mode in {"wake_only", "wake_playback"}:
+                        round_outcome = "empty" if wake_ok else "asleep"
+                        accepted, accept_reason = acceptance()
+                        add_check(
+                            "interaction_acceptance", accepted, accept_reason, [],
+                            outcome=round_outcome, mode=self.acceptance_mode,
+                        )
         except Exception as exc:
             exception_text = f"{type(exc).__name__}: {exc}"
             self.artifacts.record_anomaly(
@@ -1388,6 +1481,9 @@ class BurnScenario:
             facts = {
                 "started_at": started_at,
                 "scenario": self.scenario_name,
+                "round_outcome": round_outcome,
+                "acceptance_mode": self.acceptance_mode,
+                "asr_skipped": asr_skipped,
                 "input_text": self.fw_key,
                 "firmware": {
                     "kind": self.fw_key,
@@ -1516,6 +1612,8 @@ class BurnScenario:
             status, reason = "PASS", f"完成 {passed} 轮，全部通过"
         else:
             status, reason = "BLOCKED", "没有完成任何轮次"
+        if self.acceptance_mode == "asr_optional" and status == "PASS" and not self._asr_result_seen:
+            status, reason = "FAIL", "ASR 全程没有识别结果"
         summary = self.artifacts.finalize(status, reason)
         print(f"[{now_human()}] TASK {summary['status']}: {summary['result_directory']}", flush=True)
         self.validate_tool_log()
@@ -1546,6 +1644,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-burn", action="store_true", help="跳过烧录，只验证控制时序和启动日志")
     parser.add_argument("--wake-test", action="store_true", help="初始化后切换英文、播报唤醒词并校验唤醒")
     parser.add_argument("--interaction-test", action="store_true", help="唤醒后播报命令词并校验 ASR 与响应")
+    parser.add_argument("--acceptance", choices=sorted(MODES), default="",
+                        help="单轮交互验收模式：strict/any_asr/asr_optional/wake_only")
     parser.add_argument("--no-hisi", action="store_true", help="不采集 HISI 日志")
     parser.add_argument("--result-root", default=str(SKILL_ROOT / "result"))
     parser.add_argument("--run-name", default="",
