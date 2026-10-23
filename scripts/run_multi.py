@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import csv
 import json
 import os
@@ -104,26 +105,70 @@ def completed_rounds(result_dir: Path | None) -> int:
         return 0
 
 
-def summarize_result_dir(result_dir: Path | None) -> dict:
-    summary = {
+def empty_summary() -> dict:
+    return {
         "rounds": 0, "pass": 0, "fail": 0,
         "hit": 0, "misheard": 0, "empty": 0, "asleep": 0,
         "multi_wake": 0, "multi_asr": 0, "multi_result": 0,
         "avg_round_s": 0.0,
     }
-    if result_dir is None:
-        return summary
-    path = Path(result_dir) / "results.csv"
-    if not path.exists():
-        return summary
-    try:
-        with path.open("r", encoding="utf-8-sig", newline="") as handle:
-            records = list(csv.DictReader(handle))
-    except OSError:
-        return summary
 
-    durations: list[float] = []
-    for record in records:
+
+class ResultSummary:
+    """Incrementally read results.csv so long runs do not load it into memory."""
+
+    def __init__(self, result_dir: Path | None):
+        self.result_dir = Path(result_dir) if result_dir else None
+        self.path = self.result_dir / "results.csv" if self.result_dir else None
+        self.offset = 0
+        self.fieldnames: list[str] | None = None
+        self.summary = empty_summary()
+        self.duration_total = 0.0
+        self.duration_count = 0
+
+    def update(self) -> dict:
+        if self.path is None or not self.path.exists():
+            return self.summary
+        try:
+            size = self.path.stat().st_size
+        except OSError:
+            return self.summary
+        if size < self.offset:
+            self.offset = 0
+            self.fieldnames = None
+            self.summary = empty_summary()
+            self.duration_total = 0.0
+            self.duration_count = 0
+        if size == self.offset:
+            return self.summary
+        try:
+            with self.path.open("r", encoding="utf-8", newline="") as handle:
+                handle.seek(self.offset)
+                while True:
+                    line_start = handle.tell()
+                    line = handle.readline()
+                    if not line:
+                        break
+                    if not line.endswith("\n"):
+                        handle.seek(line_start)
+                        break
+                    self.offset = handle.tell()
+                    if self.fieldnames is None:
+                        self.fieldnames = next(csv.reader([line.lstrip("\ufeff")]))
+                        continue
+                    try:
+                        values = next(csv.reader([line.rstrip("\r\n")]))
+                    except csv.Error:
+                        continue
+                    if len(values) != len(self.fieldnames):
+                        continue
+                    self._add(dict(zip(self.fieldnames, values)))
+        except OSError:
+            pass
+        return self.summary
+
+    def _add(self, record: dict) -> None:
+        summary = self.summary
         summary["rounds"] += 1
         status = str(record.get("final_status", "")).upper()
         if status == "PASS":
@@ -149,12 +194,15 @@ def summarize_result_dir(result_dir: Path | None) -> dict:
                 start = start.astimezone().replace(tzinfo=None)
             if end.tzinfo is not None:
                 end = end.astimezone().replace(tzinfo=None)
-            durations.append((end - start).total_seconds())
+            self.duration_total += (end - start).total_seconds()
+            self.duration_count += 1
+            summary["avg_round_s"] = round(self.duration_total / self.duration_count, 1)
         except (TypeError, ValueError):
             pass
-    if durations:
-        summary["avg_round_s"] = round(sum(durations) / len(durations), 1)
-    return summary
+
+
+def summarize_result_dir(result_dir: Path | None) -> dict:
+    return ResultSummary(result_dir).update()
 
 
 def aggregate_summaries(items: list[dict]) -> dict:
@@ -286,8 +334,44 @@ def main() -> int:
     planned_rounds = len(devices) * args.rounds
     last_live_rounds = 0
     last_live_poll = 0.0
+    summary_states: dict[str, ResultSummary] = {}
+
+    def summary_for(path: Path | None) -> dict:
+        if path is None:
+            return empty_summary()
+        try:
+            key = str(path.resolve())
+        except OSError:
+            key = str(path)
+        state = summary_states.get(key)
+        if state is None:
+            state = ResultSummary(path)
+            summary_states[key] = state
+        return state.update()
+
     pending = deque(devices)
     running: list[dict] = []
+
+    def cleanup_children() -> None:
+        for item in list(running):
+            process = item.get("process")
+            if process is None or process.poll() is not None:
+                continue
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except Exception:
+                try:
+                    process.terminate()
+                except Exception:
+                    pass
+
+    atexit.register(cleanup_children)
+
     env = dict(os.environ)
     env.update({"PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"})
 
@@ -406,7 +490,7 @@ def main() -> int:
                     if key not in seen_dirs:
                         seen_dirs.add(key)
                         unique_dirs.append(path)
-                summaries = [summarize_result_dir(path) for path in unique_dirs]
+                summaries = [summary_for(path) for path in unique_dirs]
                 total = aggregate_summaries(summaries)
                 completed = total["rounds"]
                 if completed != last_live_rounds:
@@ -420,7 +504,7 @@ def main() -> int:
                     rdir = result_dir_for(result_root, str(item["device"].get("label") or item["device"]["id"]),
                                           args.rounds, item["before"], prefix=scenario,
                                           run_name=item.get("run_name"))
-                    parts.append(f"{item['device'].get('label', item['device']['id'])}={completed_rounds(rdir)}/{args.rounds}")
+                    parts.append(f"{item['device'].get('label', item['device']['id'])}={summary_for(rdir)['rounds']}/{args.rounds}")
                     item["result_dir"] = rdir
                 line = f"{now_human()} PROGRESS " + " ".join(parts)
                 print(line, flush=True)
@@ -443,7 +527,7 @@ def main() -> int:
                                                  args.rounds, item["before"], prefix=scenario,
                                                  run_name=item.get("run_name"))
                 result_dir = result_dir_path or ""
-                completed = completed_rounds(result_dir_path)
+                completed = summary_for(result_dir_path)["rounds"]
                 status = "PASS" if code == 0 else ("BLOCKED" if code == 2 else "FAIL")
                 row = {
                     "device_id": device["id"],
@@ -476,7 +560,7 @@ def main() -> int:
     final_summaries: list[tuple[dict, dict]] = []
     for row in rows:
         result_dir = Path(row["result_dir"]) if row.get("result_dir") else None
-        final_summaries.append((row, summarize_result_dir(result_dir)))
+        final_summaries.append((row, summary_for(result_dir)))
 
     outcomes_path = summary_dir / "summary_outcomes.csv"
     with outcomes_path.open("w", encoding="utf-8-sig", newline="") as outcomes_handle:
