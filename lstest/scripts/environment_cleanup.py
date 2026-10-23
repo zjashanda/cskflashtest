@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import shutil
+import signal
 import subprocess
 import time
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
@@ -58,3 +60,60 @@ def kill_processes_by_command(patterns: Iterable[str], *, exclude_pids: Iterable
     except Exception:
         return 0
     return len([line for line in result.stdout.splitlines() if line.strip()])
+
+
+def kill_process_tree(pid: int) -> bool:
+    """终止指定 PID 及其子进程树；Windows 使用 taskkill /T /F。"""
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=15,
+                creationflags=CREATE_NO_WINDOW,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+    try:
+        os.kill(pid, signal.SIGTERM)
+        return True
+    except Exception:
+        return False
+
+
+def register_process_cleanup(process_getter: Callable[[], Iterable[object]]) -> Callable[[], None]:
+    """注册退场清理：异常退出时终止仍在运行的子进程树，避免孤儿进程。
+
+    `process_getter` 返回 Popen 等进程对象列表；清理时只处理仍存活的进程。
+    """
+    def cleanup() -> None:
+        try:
+            processes = list(process_getter())
+        except Exception:
+            return
+        for process in processes:
+            if process is None:
+                continue
+            try:
+                if process.poll() is not None:
+                    continue
+            except Exception:
+                pass
+            pid = getattr(process, "pid", None)
+            if pid and kill_process_tree(int(pid)):
+                continue
+            try:
+                process.terminate()
+            except Exception:
+                pass
+
+    atexit.register(cleanup)
+    return cleanup

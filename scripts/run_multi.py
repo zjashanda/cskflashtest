@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import argparse
-import atexit
 import csv
 import json
 import os
@@ -19,7 +18,6 @@ import tempfile
 import threading
 import time
 from collections import deque
-from datetime import datetime
 from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -33,8 +31,15 @@ from lstest.scripts.environment_cleanup import (  # noqa: E402
     clear_directory,
     cleanup_temp_files,
     kill_processes_by_command,
+    register_process_cleanup,
 )
 from lstest.scripts.interaction_acceptance import MODES  # noqa: E402
+from lstest.scripts.result_stats import (  # noqa: E402
+    ResultSummary,
+    aggregate_summaries,
+    empty_summary,
+    total_line,
+)
 
 
 def now_human() -> str:
@@ -103,137 +108,6 @@ def completed_rounds(result_dir: Path | None) -> int:
             return max(0, sum(1 for _ in csv.DictReader(handle)))
     except OSError:
         return 0
-
-
-def empty_summary() -> dict:
-    return {
-        "rounds": 0, "pass": 0, "fail": 0,
-        "hit": 0, "misheard": 0, "empty": 0, "asleep": 0,
-        "multi_wake": 0, "multi_asr": 0, "multi_result": 0,
-        "avg_round_s": 0.0,
-    }
-
-
-class ResultSummary:
-    """Incrementally read results.csv so long runs do not load it into memory."""
-
-    def __init__(self, result_dir: Path | None):
-        self.result_dir = Path(result_dir) if result_dir else None
-        self.path = self.result_dir / "results.csv" if self.result_dir else None
-        self.offset = 0
-        self.fieldnames: list[str] | None = None
-        self.summary = empty_summary()
-        self.duration_total = 0.0
-        self.duration_count = 0
-
-    def update(self) -> dict:
-        if self.path is None or not self.path.exists():
-            return self.summary
-        try:
-            size = self.path.stat().st_size
-        except OSError:
-            return self.summary
-        if size < self.offset:
-            self.offset = 0
-            self.fieldnames = None
-            self.summary = empty_summary()
-            self.duration_total = 0.0
-            self.duration_count = 0
-        if size == self.offset:
-            return self.summary
-        try:
-            with self.path.open("r", encoding="utf-8", newline="") as handle:
-                handle.seek(self.offset)
-                while True:
-                    line_start = handle.tell()
-                    line = handle.readline()
-                    if not line:
-                        break
-                    if not line.endswith("\n"):
-                        handle.seek(line_start)
-                        break
-                    self.offset = handle.tell()
-                    if self.fieldnames is None:
-                        self.fieldnames = next(csv.reader([line.lstrip("\ufeff")]))
-                        continue
-                    try:
-                        values = next(csv.reader([line.rstrip("\r\n")]))
-                    except csv.Error:
-                        continue
-                    if len(values) != len(self.fieldnames):
-                        continue
-                    self._add(dict(zip(self.fieldnames, values)))
-        except OSError:
-            pass
-        return self.summary
-
-    def _add(self, record: dict) -> None:
-        summary = self.summary
-        summary["rounds"] += 1
-        status = str(record.get("final_status", "")).upper()
-        if status == "PASS":
-            summary["pass"] += 1
-        elif status == "FAIL":
-            summary["fail"] += 1
-        outcome = str(record.get("round_outcome", "")).strip().lower()
-        if outcome in {"hit", "misheard", "empty", "asleep"}:
-            summary[outcome] += 1
-        try:
-            if int(record.get("wake_result_count") or 0) > 1:
-                summary["multi_wake"] += 1
-            if int(record.get("asr_result_count") or 0) > 1:
-                summary["multi_asr"] += 1
-        except ValueError:
-            pass
-        if str(record.get("multi_result", "")).strip().lower() in {"true", "1", "yes"}:
-            summary["multi_result"] += 1
-        try:
-            start = datetime.fromisoformat(str(record.get("started_at", "")).replace("Z", "+00:00"))
-            end = datetime.fromisoformat(str(record.get("ended_at", "")).replace("Z", "+00:00"))
-            if start.tzinfo is not None:
-                start = start.astimezone().replace(tzinfo=None)
-            if end.tzinfo is not None:
-                end = end.astimezone().replace(tzinfo=None)
-            self.duration_total += (end - start).total_seconds()
-            self.duration_count += 1
-            summary["avg_round_s"] = round(self.duration_total / self.duration_count, 1)
-        except (TypeError, ValueError):
-            pass
-
-
-def summarize_result_dir(result_dir: Path | None) -> dict:
-    return ResultSummary(result_dir).update()
-
-
-def aggregate_summaries(items: list[dict]) -> dict:
-    total = {
-        "rounds": 0, "pass": 0, "fail": 0,
-        "hit": 0, "misheard": 0, "empty": 0, "asleep": 0,
-        "multi_wake": 0, "multi_asr": 0, "multi_result": 0,
-        "avg_round_s": 0.0,
-    }
-    weighted = 0.0
-    for item in items:
-        rounds = int(item.get("rounds", 0) or 0)
-        for key in (
-            "rounds", "pass", "fail", "hit", "misheard", "empty", "asleep",
-            "multi_wake", "multi_asr", "multi_result",
-        ):
-            total[key] += int(item.get(key, 0) or 0)
-        weighted += float(item.get("avg_round_s", 0.0) or 0.0) * rounds
-    if total["rounds"]:
-        total["avg_round_s"] = round(weighted / total["rounds"], 1)
-    return total
-
-
-def total_line(total: dict, completed: int, planned: int, suffix: str = "") -> str:
-    line = (
-        f"[TOTAL] rounds={completed}/{planned} pass={total['pass']} fail={total['fail']} "
-        f"hit={total['hit']} misheard={total['misheard']} empty={total['empty']} "
-        f"asleep={total['asleep']} multi_wake={total['multi_wake']} "
-        f"multi_asr={total['multi_asr']} multi_result={total['multi_result']}"
-    )
-    return f"{line} {suffix}".rstrip()
 
 
 def cleanup_before_run(devices: list[dict]) -> None:
@@ -351,26 +225,7 @@ def main() -> int:
 
     pending = deque(devices)
     running: list[dict] = []
-
-    def cleanup_children() -> None:
-        for item in list(running):
-            process = item.get("process")
-            if process is None or process.poll() is not None:
-                continue
-            try:
-                subprocess.run(
-                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
-            except Exception:
-                try:
-                    process.terminate()
-                except Exception:
-                    pass
-
-    atexit.register(cleanup_children)
+    register_process_cleanup(lambda: [item.get("process") for item in running])
 
     env = dict(os.environ)
     env.update({"PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"})
