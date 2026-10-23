@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from collections import deque
 from pathlib import Path
@@ -159,6 +160,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--result-root", default=str(SKILL_ROOT / "result"))
     parser.add_argument("--summary-dir", default="")
     parser.add_argument("--dry-run", action="store_true", help="只校验设备和端口配置，不启动烧录")
+    parser.add_argument("--stream", action="store_true", help="把每台设备的实时流水线输出到当前终端")
     parser.add_argument("--only", default="", help="only run selected devices, comma separated id or label")
     return parser
 
@@ -240,11 +242,35 @@ def main() -> int:
                     cmd += ["--acceptance", args.acceptance]
                 started = time.monotonic()
                 try:
-                    process = subprocess.Popen(
-                        cmd, cwd=str(PROJECT_ROOT), env=env,
-                        stdout=log_handle, stderr=subprocess.STDOUT,
-                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                    )
+                    if args.stream:
+                        process = subprocess.Popen(
+                            cmd, cwd=str(PROJECT_ROOT), env=env,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace", bufsize=1,
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                        )
+
+                        def _pump(proc=process, handle=log_handle, tag=label):
+                            try:
+                                for line in proc.stdout:
+                                    handle.write(line)
+                                    handle.flush()
+                                    print(f"[{tag}] {line.rstrip()}", flush=True)
+                            finally:
+                                try:
+                                    handle.flush()
+                                except Exception:
+                                    pass
+
+                        stream_thread = threading.Thread(target=_pump, daemon=True)
+                        stream_thread.start()
+                    else:
+                        process = subprocess.Popen(
+                            cmd, cwd=str(PROJECT_ROOT), env=env,
+                            stdout=log_handle, stderr=subprocess.STDOUT,
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                        )
+                        stream_thread = None
                 except Exception as exc:
                     log_handle.write(f"launcher failed: {type(exc).__name__}: {exc}\n")
                     log_handle.close()
@@ -263,7 +289,7 @@ def main() -> int:
                 running.append({
                     "device": device, "process": process, "log": log_handle,
                     "log_path": log_path, "started": started, "before": before,
-                    "run_name": run_name,
+                    "run_name": run_name, "thread": stream_thread,
                 })
                 print(f"[{now_human()}] START {device['id']} (parallel {len(running)}/{max_parallel})", flush=True)
                 if pending:
@@ -289,6 +315,9 @@ def main() -> int:
                 if code is None:
                     continue
                 finished = time.monotonic()
+                stream_thread = item.get("thread")
+                if stream_thread is not None:
+                    stream_thread.join(timeout=5)
                 item["log"].close()
                 running.remove(item)
                 device = item["device"]

@@ -6,18 +6,16 @@ set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
 set "ROUNDS=%~1"
 if "%ROUNDS%"=="" set "ROUNDS=1"
-set "DEVICE=%~2"
-if "%DEVICE%"=="" set "DEVICE=dev01"
-set "ACCEPTANCE=%~3"
+set "ACCEPTANCE=%~2"
 if "%ACCEPTANCE%"=="" set "ACCEPTANCE=any_asr"
 
 echo ============================================================
 echo 压测验收：烧录 + 唤醒/ASR
-echo 设备：%DEVICE%
-echo 轮数：%ROUNDS%
-echo 验收模式：%ACCEPTANCE%
+echo 设备列表：config\devices.json（启用多少台就执行多少台）
+echo Rounds: %ROUNDS%
+echo Acceptance: %ACCEPTANCE%
 echo ============================================================
-python -u scripts\run.py --mode burn --devices config\devices.json --device-id %DEVICE% --rounds %ROUNDS% --acceptance %ACCEPTANCE% --no-hisi
+python -u scripts\run_multi.py --mode burn --devices config\devices.json --rounds %ROUNDS% --acceptance %ACCEPTANCE% --no-hisi --stream
 set "CODE=%ERRORLEVEL%"
 echo.
 echo EXIT_CODE=%CODE%
