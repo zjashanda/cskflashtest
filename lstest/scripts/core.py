@@ -329,16 +329,22 @@ class TaskArtifacts:
         detail_fields: Sequence[str] = (),
         *,
         terminal_stream: Any | None = None,
+        run_name: str | None = None,
+        append: bool = False,
     ):
-        stamp = now_dt().strftime("%Y%m%d_%H%M%S")
-        base = Path(result_root) / f"{stamp}_{task_slug}"
-        candidate = base
-        suffix = 1
-        while candidate.exists():
-            candidate = Path(f"{base}_{suffix:02d}")
-            suffix += 1
-        self.run_dir = candidate
-        (self.run_dir / "serial_logs").mkdir(parents=True, exist_ok=False)
+        if run_name:
+            self.run_dir = Path(result_root) / run_name
+            self.run_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            stamp = now_dt().strftime("%Y%m%d_%H%M%S")
+            base = Path(result_root) / f"{stamp}_{task_slug}"
+            candidate = base
+            suffix = 1
+            while candidate.exists():
+                candidate = Path(f"{base}_{suffix:02d}")
+                suffix += 1
+            self.run_dir = candidate
+        (self.run_dir / "serial_logs").mkdir(parents=True, exist_ok=True)
         self.task_id = self.run_dir.name
         self.tool_log_path = self.run_dir / "tool.log"
         self.results_path = self.run_dir / "results.csv"
@@ -352,13 +358,17 @@ class TaskArtifacts:
         self._legacy_stdout_disabled = False
         self.timeline = TimelineLedger(self._append_timeline_line, now_human)
         result_fields = list(dict.fromkeys([*self.RESULT_FIELDS, *detail_fields]))
-        self._csv = self.results_path.open("w", encoding="utf-8-sig", newline="")
+        results_exist = append and self.results_path.exists() and self.results_path.stat().st_size > 0
+        cases_exist = append and self.cases_path.exists() and self.cases_path.stat().st_size > 0
+        self._csv = self.results_path.open("a" if results_exist else "w", encoding="utf-8-sig", newline="")
         self._writer = csv.DictWriter(self._csv, fieldnames=result_fields, extrasaction="ignore")
-        self._writer.writeheader()
+        if not results_exist:
+            self._writer.writeheader()
         self._csv.flush()
-        self._cases = self.cases_path.open("w", encoding="utf-8-sig", newline="")
+        self._cases = self.cases_path.open("a" if cases_exist else "w", encoding="utf-8-sig", newline="")
         self._cases_writer = csv.DictWriter(self._cases, fieldnames=self.CASE_FIELDS, extrasaction="ignore")
-        self._cases_writer.writeheader()
+        if not cases_exist:
+            self._cases_writer.writeheader()
         self._cases.flush()
         self._cases_frozen = False
         self._frozen_case_count = 0

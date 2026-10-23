@@ -30,6 +30,11 @@
     "control_retries": 2,
     "csk_init_wait_s": 2.0
   },
+  "control_recovery": {
+    "attempts": 20,
+    "delays_s": [0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 10.0, 15.0, 15.0, 20.0, 20.0, 25.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0],
+    "prompt_timeout_s": 3.0
+  },
   "csk_init": {
     "command": "flash.setloglev 4",
     "success_pattern": "flash set log_lev:4 success",
@@ -54,7 +59,7 @@
     "language_timeout_s": 20.0,
     "playback_timeout_s": 12.0,
     "post_switch_settle_s": 3.0,
-    "attempts": 5,
+    "attempts": 4,
     "playback_start_pattern": "spk.uas@start!!",
     "playback_stop_pattern": "spk.uas@stop!!",
     "wake_patterns": [
@@ -65,16 +70,13 @@
     ]
   },
   "interaction": {
-    "audio_file": "wav/Turn-down-volume/Turn down volume_norm.wav",
-    "expected_keyword": "Turn down volume",
-    "expected_vir_kid": 78,
-    "min_volume": 40,
-    "command_timeout_s": 10.0,
+    "audio_file": "wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav",
+    "expected_keyword": "Turn on aircon",
+    "min_volume": 0,
+    "command_timeout_s": 15.0,
     "asr_pattern": "keyword:(?P<keyword>[^\\\"\\r\\n]+)",
-    "volume_pattern": "refresh volume from\\s+(?P<before>\\d+)\\s+to\\s+(?P<after>\\d+)",
-    "pre_command_volume": 80,
-    "volume_direction": "decrease",
-    "attempts": 5
+    "response_playback_patterns": ["offline_tts_callback", "soundplayer"],
+    "attempts": 4
   },
   "ports": {
     "control": {

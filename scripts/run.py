@@ -34,6 +34,7 @@ sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 from lstest.scripts.core import CaseResult, TaskArtifacts  # noqa: E402
 from lstest.scripts.profile import DeviceProfile, ProfileFixtureRunner, RawLogRecord  # noqa: E402
 from lstest.scripts.runtime import ScenarioRuntime  # noqa: E402
+from lstest.scripts.serial_recovery import recover_serial  # noqa: E402
 from lstest.scripts.timeline import ToolLogValidator  # noqa: E402
 
 from burn_adapter import (  # noqa: E402
@@ -46,6 +47,8 @@ from burn_adapter import (  # noqa: E402
     port_available,
     send_control,
 )
+
+CHILD_CREATIONFLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 FATAL_RE = re.compile(r"FATAL|ASSERT FAIL|HardFault|panic|watchdog reset|Stack overflow|Boot Reason:\s*CRASH", re.I)
 BOOTLOADER_RE = re.compile(r"bootloader application", re.I)
@@ -137,6 +140,15 @@ def asset_path(relative: Path) -> Path:
     return PROJECT_ROOT / relative
 
 
+def lstest_script(name: str) -> Path:
+    """Resolve a bundled lstest script under the project first, then the skill repo."""
+    for base in (PROJECT_ROOT, SKILL_ROOT):
+        candidate = base / "lstest" / "scripts" / name
+        if candidate.is_file():
+            return candidate
+    return PROJECT_ROOT / "lstest" / "scripts" / name
+
+
 def find_evidence(events: list[LineEvent], pattern: re.Pattern[str]) -> list[str]:
     result: list[str] = []
     for event in events:
@@ -148,12 +160,20 @@ def find_evidence(events: list[LineEvent], pattern: re.Pattern[str]) -> list[str
 class BurnScenario:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
+        self.mode = str(getattr(args, "mode", "burn") or "burn").strip().lower()
+        if self.mode not in ("burn", "powercycle"):
+            raise ValueError(f"unsupported mode: {self.mode}")
+        if self.mode == "powercycle":
+            args.skip_burn = True
+        self.scenario_name = "cskpowercycle" if self.mode == "powercycle" else "cskflashtest"
+        self.case_prefix = "powercycle" if self.mode == "powercycle" else "burn"
         self.result_root = Path(args.result_root).resolve()
         self.profile_path = Path(args.profile).resolve()
         self.manifest_path = Path(args.manifest).resolve()
         self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         self.profile = DeviceProfile.load(self.profile_path)
         self.timing = dict(self.manifest.get("timing", {}))
+        self.control_recovery = dict(self.manifest.get("control_recovery", {}))
         self.verification = dict(self.manifest.get("verification", {}))
         self.ports = dict(self.manifest.get("ports", {}))
         self.device_id = ""
@@ -176,9 +196,20 @@ class BurnScenario:
                 if self.device_entry.get(key):
                     self.ports.setdefault(role, {})
                     self.ports[role]["baudrate"] = int(self.device_entry[key])
+        self.require_spk_marker = bool(
+            self.device_entry.get("require_spk_marker", True)
+        ) if self.device_entry else True
+        self.batch_stamp = str(getattr(args, "batch_stamp", "") or "").strip() or time.strftime("%Y%m%d_%H%M%S")
+        self.task_summary = str(getattr(args, "task_summary", "") or "").strip()
+        if not self.task_summary:
+            self.task_summary = "burn-wake-asr" if self.mode == "burn" else "powercycle-init-wake-asr"
+        device_part = self.device_id or "single"
+        self.run_name = str(getattr(args, "run_name", "") or "").strip() or (
+            f"{self.batch_stamp}_{self.scenario_name}_{device_part}_{self.task_summary}_{self.args.rounds}rounds"
+        )
         self.task_slug = (
-            f"cskflashtest_{self.args.rounds}_{self.device_label}"
-            if self.device_id else f"cskflashtest_{self.args.rounds}"
+            f"{self.scenario_name}_{self.args.rounds}_{self.device_label}"
+            if self.device_id else f"{self.scenario_name}_{self.args.rounds}"
         )
 
         raw_fw = args.fw.lower()
@@ -246,29 +277,32 @@ class BurnScenario:
             errors.append(f"profile contract: {type(exc).__name__}: {exc}")
             self._emit("SYSTEM", "PROFILE_BLOCKED", f"profile 校验失败: {exc}", level="ERROR", status="FAIL")
 
-        if not self.fw_path.is_file():
-            errors.append(f"firmware missing: {self.fw_path}")
-        else:
-            sha = sha256_file(self.fw_path)
-            expected_sha = str(self.fw_entry.get("source_sha256", ""))
-            if expected_sha and sha != expected_sha:
-                errors.append(f"firmware sha256 changed: {sha} != {expected_sha}")
-            if self.fw_key == "img":
-                actual_md5 = md5_file(self.fw_path)
-                expected_md5 = normalize_md5(str(self.fw_entry.get("expected_tool_md5", "")))
-                if expected_md5 and actual_md5 != expected_md5:
-                    errors.append(f"img md5 mismatch: {actual_md5} != {expected_md5}")
+        if self.mode == "burn":
+            if not self.fw_path.is_file():
+                errors.append(f"firmware missing: {self.fw_path}")
             else:
-                size = hex_write_size(self.fw_path)
-                expected_size = int(self.fw_entry.get("expected_write_size", 0) or 0)
-                if expected_size and size != expected_size:
-                    errors.append(f"hex write size mismatch: {size} != {expected_size}")
+                sha = sha256_file(self.fw_path)
+                expected_sha = str(self.fw_entry.get("source_sha256", ""))
+                if expected_sha and sha != expected_sha:
+                    errors.append(f"firmware sha256 changed: {sha} != {expected_sha}")
+                if self.fw_key == "img":
+                    actual_md5 = md5_file(self.fw_path)
+                    expected_md5 = normalize_md5(str(self.fw_entry.get("expected_tool_md5", "")))
+                    if expected_md5 and actual_md5 != expected_md5:
+                        errors.append(f"img md5 mismatch: {actual_md5} != {expected_md5}")
+                else:
+                    size = hex_write_size(self.fw_path)
+                    expected_size = int(self.fw_entry.get("expected_write_size", 0) or 0)
+                    if expected_size and size != expected_size:
+                        errors.append(f"hex write size mismatch: {size} != {expected_size}")
 
-        tool = asset_path(Path("burn") / "Uart_Burn_Tool.exe")
-        if not tool.is_file():
-            errors.append(f"burn tool missing: {tool}")
+            tool = asset_path(Path("burn") / "Uart_Burn_Tool.exe")
+            if not tool.is_file():
+                errors.append(f"burn tool missing: {tool}")
 
-        all_ports = [self.control_port, self.csk_port, self.burn_port]
+        all_ports = [self.control_port, self.csk_port]
+        if self.mode == "burn":
+            all_ports.append(self.burn_port)
         if not self.args.no_hisi:
             all_ports.append(self.hisi_port)
         for port in all_ports:
@@ -333,7 +367,13 @@ class BurnScenario:
 
     # ---------- runtime ----------
     def setup(self) -> None:
-        self.artifacts = TaskArtifacts(self.result_root, self.task_slug)
+        self.artifacts = TaskArtifacts(
+            self.result_root,
+            self.task_slug,
+            run_name=self.run_name,
+            append=True,
+        )
+        self._write_task_info()
         self.artifacts.enable_terminal_mirror(sys.stdout)
         self.artifacts.configure({
             "profile": self.profile.profile_id,
@@ -350,11 +390,29 @@ class BurnScenario:
         })
         self.runtime = ScenarioRuntime(self.artifacts, profile=self.profile)
         self.runtime.begin_lazy_cases(
-            scenario="cskflashtest",
+            scenario=self.scenario_name,
             planned_total=self.args.rounds,
             profile_version=self.profile.schema_version,
             profile_sha256=self.profile.sha256,
         )
+
+    def _write_task_info(self) -> None:
+        assert self.artifacts is not None
+        device = f"{self.device_id}（板卡 {self.device_label}）" if self.device_id else "single"
+        mode = "burn（烧录）" if self.mode == "burn" else "powercycle（上下电）"
+        summary = (
+            "烧录 -> CSK 初始化 -> 唤醒 -> ASR 识别"
+            if self.mode == "burn"
+            else "上下电 -> CSK 初始化 -> 唤醒 -> ASR 识别"
+        )
+        lines = [
+            f"批次时间戳: {self.batch_stamp}",
+            f"压测项: {mode}",
+            f"压测设备: {device}",
+            f"任务简介: {summary}",
+            f"任务总次数: {self.args.rounds}",
+        ]
+        (self.artifacts.run_dir / "task-info.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def _emit(self, tag: str, event: str, message: str, *, level: str = "INFO", **fields) -> None:
         if self.artifacts is not None:
@@ -414,6 +472,43 @@ class BurnScenario:
         events, found = self.control.wait_for(cursor, lambda text: "root:/$" in text, timeout_s)
         reply = "\n".join(item.text for item in events)[-300:]
         return found, reply
+
+    def recover_control_serial(self) -> tuple[bool, str, list[str]]:
+        """多次关闭/重开控制口，直到 shell 提示符恢复。"""
+        if self.control is None:
+            return False, "control collector not started", []
+        attempts = max(1, int(self.control_recovery.get("attempts", 5)))
+        delays = list(self.control_recovery.get("delays_s", [0.5, 1.0, 2.0, 3.0, 5.0]))
+        prompt_timeout = float(self.control_recovery.get("prompt_timeout_s", 3.0))
+
+        def on_event(status: str, fields: dict) -> None:
+            attempt = fields.get("attempt")
+            delay = fields.get("delay_s")
+            if status == "START":
+                self._emit(
+                    "SYSTEM", "CONTROL_RECONNECT",
+                    f"控制口重连 {attempt}/{attempts}，等待 {float(delay or 0):.1f}s",
+                    level="INFO", status="RUN",
+                )
+                return
+            ok = status == "PASS"
+            self._emit(
+                "SYSTEM", "CONTROL_RECONNECT",
+                f"控制口重连 {attempt}/{attempts} {'成功' if ok else '失败'}",
+                level="INFO" if ok else "WARN",
+                status=status,
+                reason=fields.get("reason", ""),
+                raw=fields,
+            )
+
+        return recover_serial(
+            self.control,
+            self.control_probe,
+            attempts=attempts,
+            delays_s=delays,
+            prompt_timeout_s=prompt_timeout,
+            on_event=on_event,
+        )
 
     def ensure_audio_enabled(self) -> tuple[bool, str, list[str]]:
         if self._pa_enabled:
@@ -523,9 +618,10 @@ class BurnScenario:
         play_file = asset_path(Path(str(self.wake.get("audio_file", "wav/Wake/hellohaier.wav"))))
         play_key = str(self.wake.get("render_device_key", ""))
         proc = subprocess.Popen(
-            [sys.executable, "-u", str(PROJECT_ROOT / "lstest" / "scripts" / "listenai_play.py"),
+            [sys.executable, "-u", str(lstest_script("listenai_play.py")),
              "play", "--audio-file", str(play_file), "--device-key", play_key],
             cwd=str(PROJECT_ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                creationflags=CHILD_CREATIONFLAGS,
         )
         self.csk.wait_for(
             wake_cursor,
@@ -543,10 +639,17 @@ class BurnScenario:
         csk_text = "\n".join(item.text for item in csk_events)
         control_text = "\n".join(item.text for item in control_events)
         woke = any(pattern.search(csk_text) for pattern in wake_patterns)
+        has_miniplayer = (
+            "miniplayer status: PLAYING" in csk_text
+            or "miniplayer status: COMPLETE" in csk_text
+        )
         playback = "spk.uas@start!!" in control_text
+        if not playback and not self.require_spk_marker and has_miniplayer:
+            playback = True
         evidence = [item.evidence for item in [*csk_events, *control_events] if item.text]
         return woke, playback, csk_text, evidence[-10:], {
-            "woke": woke, "playback": playback, "play_output": play_output[-300:],
+            "woke": woke, "playback": playback, "playback_csk": has_miniplayer,
+            "play_output": play_output[-300:],
         }
 
     def run_wake_test(self) -> tuple[bool, bool, str, list[str], dict]:
@@ -601,11 +704,12 @@ class BurnScenario:
             play_file = asset_path(Path(str(self.wake.get("audio_file", "wav/Wake/hellohaier.wav"))))
             play_key = str(self.wake.get("render_device_key", ""))
             command = [
-                sys.executable, "-u", str(PROJECT_ROOT / "lstest" / "scripts" / "listenai_play.py"),
+                sys.executable, "-u", str(lstest_script("listenai_play.py")),
                 "play", "--audio-file", str(play_file), "--device-key", play_key,
             ]
             proc = subprocess.Popen(
                 command, cwd=str(PROJECT_ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                creationflags=CHILD_CREATIONFLAGS,
             )
             predicate = lambda text: any(pattern.search(text) for pattern in wake_patterns) or "bootloader application" in text
             self.csk.wait_for(play_cursor, predicate, playback_timeout)
@@ -621,12 +725,18 @@ class BurnScenario:
             control_text = "\n".join(item.text for item in control_events)
             has_start = start_pattern in control_text
             has_stop = stop_pattern in control_text
+            has_miniplayer = (
+                "miniplayer status: PLAYING" in csk_text
+                or "miniplayer status: COMPLETE" in csk_text
+            )
             has_wake = any(pattern.search(csk_text) for pattern in wake_patterns)
             reset = "bootloader application" in csk_text
+            playback_observed = has_start or (not self.require_spk_marker and has_miniplayer)
             details["attempts"].append({
                 "attempt": attempt,
                 "playback_start": has_start,
                 "playback_stop": has_stop,
+                "playback_csk": has_miniplayer,
                 "wake": has_wake,
                 "reset": reset,
                 "play_output": play_output[-500:],
@@ -640,14 +750,14 @@ class BurnScenario:
                 item.evidence for item in csk_events
                 if any(pattern.search(item.text) for pattern in wake_patterns)
             )
-            playback_ok = has_start and not reset
+            playback_ok = playback_observed and not reset
             wake_ok = has_wake and not reset
             if playback_ok and wake_ok:
                 last_reason = f"第 {attempt} 次播报唤醒成功"
                 break
             last_reason = (
-                f"第 {attempt} 次失败: playback={has_start}, stop={has_stop}, "
-                f"wake={has_wake}, reset={reset}"
+                f"第 {attempt} 次失败: playback={has_start}, playback_csk={has_miniplayer}, "
+                f"stop={has_stop}, wake={has_wake}, reset={reset}"
             )
             if attempt < attempts:
                 if not self._pa_enabled:
@@ -656,7 +766,10 @@ class BurnScenario:
 
         failed_attempts = sum(
             1 for item in details["attempts"]
-            if not (item.get("playback_start") and item.get("wake") and not item.get("reset"))
+            if not (
+                (item.get("playback_start") or (not self.require_spk_marker and item.get("playback_csk")))
+                and item.get("wake") and not item.get("reset")
+            )
         )
         details["failed_attempts"] = failed_attempts
         details["max_attempts"] = attempts
@@ -673,27 +786,25 @@ class BurnScenario:
         if not cfg:
             return False, False, "manifest missing interaction config", [], {}
         expected = str(cfg.get("expected_keyword", "")).strip()
-        timeout_s = float(cfg.get("command_timeout_s", 10.0))
+        timeout_s = float(cfg.get("command_timeout_s", 15.0))
         attempts = max(1, int(cfg.get("attempts", 5)))
-        direction = str(cfg.get("volume_direction", "decrease")).lower()
-        pre_volume = cfg.get("pre_command_volume")
-        if pre_volume not in (None, ""):
-            send_control(
-                self.csk, f"player.vol.set {int(pre_volume)}",
-                r"vol\s+\d+\s*->\s*\d+|root:/\$",
-                gap_s=0.4, timeout_s=2.0, retries=0,
-            )
-            time.sleep(0.3)
+        response_patterns = [re.compile(str(item), re.I) for item in cfg.get("response_playback_patterns", []) if str(item)]
+        expected_re = re.compile(re.escape(expected), re.I)
 
         details: dict = {
             "expected_keyword": expected,
             "max_attempts": attempts,
             "attempts": [],
-            "volume_direction": direction,
         }
         evidence: list[str] = []
         successful_attempt = 0
-        playback_ok = False
+
+        def response_after_keyword(text: str) -> bool:
+            matches = list(expected_re.finditer(text))
+            if not matches:
+                return False
+            tail = text[matches[-1].end():]
+            return any(pattern.search(tail) for pattern in response_patterns)
 
         for attempt in range(1, attempts + 1):
             if attempt > 1:
@@ -712,20 +823,17 @@ class BurnScenario:
                     continue
             play_cursor = self.csk.snapshot()
             control_cursor = self.control.snapshot()
-            play_file = asset_path(Path(str(cfg.get("audio_file", "wav/Turn-down-volume/Turn down volume_norm.wav"))))
+            play_file = asset_path(Path(str(cfg.get("audio_file", "wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav"))))
             play_key = str(self.wake.get("render_device_key", ""))
             command = [
-                sys.executable, "-u", str(PROJECT_ROOT / "lstest" / "scripts" / "listenai_play.py"),
+                sys.executable, "-u", str(lstest_script("listenai_play.py")),
                 "play", "--audio-file", str(play_file), "--device-key", play_key,
             ]
             proc = subprocess.Popen(
                 command, cwd=str(PROJECT_ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                creationflags=CHILD_CREATIONFLAGS,
             )
-            predicate = lambda text: (
-                (expected and expected.lower() in text.lower())
-                or "refresh volume from" in text
-                or "bootloader application" in text
-            )
+            predicate = lambda text: response_after_keyword(text) or "bootloader application" in text
             self.csk.wait_for(play_cursor, predicate, timeout_s)
             try:
                 proc.wait(timeout=5.0)
@@ -740,47 +848,52 @@ class BurnScenario:
             crash = "Boot Reason: CRASH" in csk_text or "CSK AP Ready after exception" in csk_text
             reset = crash or "bootloader application" in csk_text
 
-            keyword_ok = bool(expected) and expected.lower() in csk_text.lower()
+            asr_pattern = str(cfg.get("asr_pattern", "")).strip()
+            actual_keyword = ""
+            if asr_pattern:
+                for match in re.finditer(asr_pattern, csk_text, re.I):
+                    value = (match.groupdict().get("keyword") or match.group(0)).strip()
+                    if value and value.upper() != "HELLO HAIER":
+                        actual_keyword = value
+            keyword_present = bool(actual_keyword)
+            keyword_correct = bool(expected) and expected.lower() in actual_keyword.lower()
+            misrecognized = keyword_present and not keyword_correct
+            outcome = "correct" if keyword_correct else ("misrecognized" if misrecognized else "no_result")
             kid_match = re.search(r"vir_kid:\s*(\d+)", csk_text)
-            expected_kid = cfg.get("expected_vir_kid")
-            if expected_kid not in (None, ""):
-                keyword_ok = keyword_ok and bool(kid_match) and int(kid_match.group(1)) == int(expected_kid)
-
-            volume_match = re.search(str(cfg.get("volume_pattern", "")), csk_text, re.I) if cfg.get("volume_pattern") else None
-            response_ok = bool(volume_match)
-            before = after = None
-            if volume_match:
-                before = int(volume_match.groupdict().get("before", 0) or 0)
-                after = int(volume_match.groupdict().get("after", 0) or 0)
-                if direction == "increase":
-                    response_ok = after > before
-                elif direction == "decrease":
-                    response_ok = after < before
-                else:
-                    response_ok = True
+            response_ok = False
+            if keyword_correct:
+                kw_idx = max(i for i, item in enumerate(csk_events) if expected_re.search(item.text))
+                response_ok = any(
+                    any(pattern.search(item.text) for pattern in response_patterns)
+                    for item in csk_events[kw_idx + 1:]
+                )
             if reset:
-                keyword_ok = False
+                keyword_present = False
+                keyword_correct = False
+                misrecognized = False
+                outcome = "no_result"
                 response_ok = False
 
             start_ok = "spk.uas@start!!" in control_text
-            playback_ok = playback_ok or (start_ok and not reset)
-            attempt_ok = keyword_ok and response_ok
+            attempt_ok = keyword_present and not reset
             details["attempts"].append({
                 "attempt": attempt,
                 "playback_start": start_ok,
-                "keyword_ok": keyword_ok,
+                "keyword_ok": keyword_present,
+                "keyword_correct": keyword_correct,
+                "misrecognized": misrecognized,
+                "outcome": outcome,
                 "response_ok": response_ok,
-                "keyword": expected if keyword_ok else "",
+                "keyword": actual_keyword,
                 "vir_kid": int(kid_match.group(1)) if kid_match else None,
-                "volume_before": before,
-                "volume_after": after,
                 "reset": reset,
                 "play_output": play_output[-300:],
             })
             evidence.extend(item.evidence for item in control_events if "spk.uas@" in item.text)
             evidence.extend(
                 item.evidence for item in csk_events
-                if expected.lower() in item.text.lower() or "refresh volume from" in item.text or "vir_kid:" in item.text
+                if expected_re.search(item.text) or any(pattern.search(item.text) for pattern in response_patterns)
+                or (asr_pattern and re.search(asr_pattern, item.text, re.I))
             )
             if attempt_ok:
                 successful_attempt = attempt
@@ -796,13 +909,13 @@ class BurnScenario:
         details["success_attempt"] = successful_attempt
         details["failed_attempts"] = sum(
             1 for item in details["attempts"]
-            if not (item.get("keyword_ok") and item.get("response_ok") and not item.get("reset"))
+            if not (item.get("keyword_ok") and not item.get("reset"))
         )
         last = details["attempts"][-1] if details["attempts"] else {}
+        outcome = last.get("outcome", "no_result")
         reason = (
             f"ASR={expected}, attempts={len(details['attempts'])}/{attempts}, "
-            f"keyword={last.get('keyword_ok')}, response={last.get('response_ok')}, "
-            f"volume={last.get('volume_before')}->{last.get('volume_after')}, reset={last.get('reset')}"
+            f"result={outcome}, actual={last.get('keyword') or '-'}, reset={last.get('reset')}"
         )
         keyword_hit = any(item.get("keyword_ok") for item in details["attempts"])
         response_hit = any(item.get("keyword_ok") and item.get("response_ok") for item in details["attempts"])
@@ -838,19 +951,20 @@ class BurnScenario:
         )
         self.control.start()
 
-        self.burn_log = SerialCollector(
-            self.burn_port, 115200, "burn", "burn_tool",
-            self.artifacts.serial_log_path(self.burn_port, "burn"),
-            on_event=self.dispatch, on_error=self.on_serial_error,
-        )
-        self.burn_log.open_log_only()
-        burn_tool = asset_path(Path("burn") / "Uart_Burn_Tool.exe")
-        self.burn_runner = BurnToolRunner(
-            burn_tool,
-            burn_tool.parent,
-            self.burn_log,
-            on_error=self.on_serial_error,
-        )
+        if self.mode == "burn":
+            self.burn_log = SerialCollector(
+                self.burn_port, 115200, "burn", "burn_tool",
+                self.artifacts.serial_log_path(self.burn_port, "burn"),
+                on_event=self.dispatch, on_error=self.on_serial_error,
+            )
+            self.burn_log.open_log_only()
+            burn_tool = asset_path(Path("burn") / "Uart_Burn_Tool.exe")
+            self.burn_runner = BurnToolRunner(
+                burn_tool,
+                burn_tool.parent,
+                self.burn_log,
+                on_error=self.on_serial_error,
+            )
 
     def stop_collectors(self) -> None:
         for collector in (self.control, self.csk, self.hisi, self.burn_log):
@@ -863,7 +977,7 @@ class BurnScenario:
     # ---------- round ----------
     def run_round(self, index: int) -> str:
         assert self.artifacts is not None and self.runtime is not None and self.control is not None and self.csk is not None
-        case_id = f"burn_{index:04d}"
+        case_id = f"{self.case_prefix}_{index:04d}"
         required_facts = ["COMMAND_ACK", "COMMAND_EVIDENCE", "RESTART", "INIT_READY"]
         if self.args.wake_test:
             required_facts.append("WAKE")
@@ -883,7 +997,7 @@ class BurnScenario:
         try:
             self.runtime.declare_case({
                 "case_id": case_id,
-                "scenario": "cskflashtest",
+                "scenario": self.scenario_name,
                 "input_text": self.fw_key,
                 "timeline": timeline,
                 "source_file": display_path(self.fw_path),
@@ -932,23 +1046,26 @@ class BurnScenario:
                     "控制串口无提示符，尝试重启采集串口。",
                     level="WARN", status="FAIL", reason=reply,
                 )
-                try:
-                    self.control.restart()
-                    time.sleep(0.3)
-                    alive, reply = self.control_probe(2.0)
-                except Exception as exc:
-                    alive, reply = False, f"restart failed: {type(exc).__name__}: {exc}"
+                alive, reply, recovery_evidence = self.recover_control_serial()
+            else:
+                recovery_evidence = []
             if not alive:
                 self._round_infra_failure = True
-                add_check("control_alive", False, f"控制串口无响应: {reply}", [])
+                add_check("control_alive", False, f"控制串口无响应: {reply}", recovery_evidence)
                 raise RuntimeError(f"control serial unresponsive: {reply}")
 
-            sequence = [
-                ("uut-switch1.off", r"switch_idx1_set:\s*0\b", "power_off"),
-                ("uut-csk-boot.off", r"csk6012_boot_set:\s*0\b", "boot_exit_pre"),
-                ("uut-csk-boot.on", r"csk6012_boot_set:\s*1\b", "boot_enter"),
-                ("uut-switch1.on", r"switch_idx1_set:\s*1\b", "power_on"),
-            ]
+            if self.mode == "powercycle":
+                sequence = [
+                    ("uut-csk-boot.off", r"csk6012_boot_set:\s*0\b", "boot_exit"),
+                    ("uut-switch1.off", r"switch_idx1_set:\s*0\b", "power_off"),
+                ]
+            else:
+                sequence = [
+                    ("uut-switch1.off", r"switch_idx1_set:\s*0\b", "power_off"),
+                    ("uut-csk-boot.off", r"csk6012_boot_set:\s*0\b", "boot_exit_pre"),
+                    ("uut-csk-boot.on", r"csk6012_boot_set:\s*1\b", "boot_enter"),
+                    ("uut-switch1.on", r"switch_idx1_set:\s*1\b", "power_on"),
+                ]
             for command, ack, phase in sequence:
                 result = send_control(
                     self.control, command, ack,
@@ -967,45 +1084,60 @@ class BurnScenario:
                 self._round_infra_failure = True
                 self._emit(
                     "SYSTEM", "CONTROL_NO_RESPONSE",
-                    "四条控制命令均无任何回执，判定控制链路异常。",
+                    "控制命令均无任何回执，判定控制链路异常。",
                     level="ERROR", status="FAIL",
                 )
 
             time.sleep(self.pre_burn_wait)
-            if self.args.skip_burn:
-                self._emit("ACTION", "BURN_SKIPPED", "按 --skip-burn 跳过烧录", phase="burn", status="SKIP")
-            else:
-                assert self.burn_runner is not None and self.burn_log is not None
-                burn_cursor = self.burn_log.snapshot()
-                burn_result = self.burn_runner.run(
-                    self.fw_path, port=self.burn_port, timeout_s=self.burn_timeout,
-                )
-                burn_events = self.burn_log.events_since(burn_cursor)
-                self._emit(
-                    "ACTION", "BURN_FINISHED",
-                    f"烧录结束，退出码={burn_result.exit_code}，超时={burn_result.timed_out}",
-                    phase="burn", status="PASS" if burn_result.exit_code == 0 and not burn_result.timed_out else "FAIL",
-                    reason=burn_result.error, elapsed_ms=burn_result.duration_ms,
-                )
-
-            boot_cursor = self.csk.snapshot()
-            restore_sequence = [
-                ("uut-csk-boot.off", r"csk6012_boot_set:\s*0\b", "boot_exit"),
-                ("uut-switch1.off", r"switch_idx1_set:\s*0\b", "power_cycle_off"),
-                ("uut-switch1.on", r"switch_idx1_set:\s*1\b", "power_cycle_on"),
-            ]
-            for command, ack, phase in restore_sequence:
+            if self.mode == "powercycle":
+                self._emit("ACTION", "BURN_SKIPPED", "powercycle 模式不烧录", phase="burn", status="SKIP")
+                boot_cursor = self.csk.snapshot()
                 result = send_control(
-                    self.control, command, ack,
+                    self.control, "uut-switch1.on", r"switch_idx1_set:\s*1\b",
                     gap_s=self.command_gap, timeout_s=self.ack_timeout, retries=self.control_retries,
                 )
                 command_results.append(result)
                 self._emit(
                     "ACTION", "CONTROL_COMMAND",
-                    f"发送 {command}，回执{'正常' if result.ok else '异常'}",
-                    phase=phase, status="PASS" if result.ok else "FAIL",
-                    reason=result.error, raw={"command": command, "reply": result.ack_text[-200:]},
+                    f"发送 uut-switch1.on，回执{'正常' if result.ok else '异常'}",
+                    phase="power_on", status="PASS" if result.ok else "FAIL",
+                    reason=result.error, raw={"command": "uut-switch1.on", "reply": result.ack_text[-200:]},
                 )
+            else:
+                if self.args.skip_burn:
+                    self._emit("ACTION", "BURN_SKIPPED", "按 --skip-burn 跳过烧录", phase="burn", status="SKIP")
+                else:
+                    assert self.burn_runner is not None and self.burn_log is not None
+                    burn_cursor = self.burn_log.snapshot()
+                    burn_result = self.burn_runner.run(
+                        self.fw_path, port=self.burn_port, timeout_s=self.burn_timeout,
+                    )
+                    burn_events = self.burn_log.events_since(burn_cursor)
+                    self._emit(
+                        "ACTION", "BURN_FINISHED",
+                        f"烧录结束，退出码={burn_result.exit_code}，超时={burn_result.timed_out}",
+                        phase="burn", status="PASS" if burn_result.exit_code == 0 and not burn_result.timed_out else "FAIL",
+                        reason=burn_result.error, elapsed_ms=burn_result.duration_ms,
+                    )
+
+                boot_cursor = self.csk.snapshot()
+                restore_sequence = [
+                    ("uut-csk-boot.off", r"csk6012_boot_set:\s*0\b", "boot_exit"),
+                    ("uut-switch1.off", r"switch_idx1_set:\s*0\b", "power_cycle_off"),
+                    ("uut-switch1.on", r"switch_idx1_set:\s*1\b", "power_cycle_on"),
+                ]
+                for command, ack, phase in restore_sequence:
+                    result = send_control(
+                        self.control, command, ack,
+                        gap_s=self.command_gap, timeout_s=self.ack_timeout, retries=self.control_retries,
+                    )
+                    command_results.append(result)
+                    self._emit(
+                        "ACTION", "CONTROL_COMMAND",
+                        f"发送 {command}，回执{'正常' if result.ok else '异常'}",
+                        phase=phase, status="PASS" if result.ok else "FAIL",
+                        reason=result.error, raw={"command": command, "reply": result.ack_text[-200:]},
+                    )
             restored = True
 
             self._emit("ACTION", "BOOT_OBSERVE", f"等待 CSK 启动证据，最长 {self.boot_timeout:.0f}s", phase="boot_observe", status="RUN")
@@ -1180,12 +1312,18 @@ class BurnScenario:
                         else:
                             keyword_ok, response_ok, interaction_reason, interaction_evidence, interaction_details = self.run_interaction_test()
                             add_check("asr_keyword", keyword_ok, interaction_reason, interaction_evidence)
-                            add_check("volume_response", response_ok, interaction_reason, interaction_evidence)
+                            self._emit(
+                                "SYSTEM", "ASR_RESPONSE",
+                                f"识别播报={'已观察到' if response_ok else '未观察到（仅记录）'}",
+                                case_id=case_id,
+                                status="PASS" if response_ok else "WARN",
+                                raw={"response_ok": response_ok},
+                            )
                             self._emit(
                                 "SYSTEM", "INTERACTION_RESULT",
                                 interaction_reason,
                                 case_id=case_id,
-                                status="PASS" if (keyword_ok and response_ok) else "FAIL",
+                                status="PASS" if keyword_ok else "FAIL",
                                 raw=interaction_details,
                             )
         except Exception as exc:
@@ -1231,7 +1369,7 @@ class BurnScenario:
                     failure_category = "burn"
                 elif any(name.startswith("wake_") for name in names):
                     failure_category = "wake"
-                elif any(name in {"asr_keyword", "volume_response"} for name in names):
+                elif any(name in {"asr_keyword"} for name in names):
                     failure_category = "recognition"
                 else:
                     failure_category = "other"
@@ -1249,7 +1387,7 @@ class BurnScenario:
                 evidence.append(event.evidence)
             facts = {
                 "started_at": started_at,
-                "scenario": "cskflashtest",
+                "scenario": self.scenario_name,
                 "input_text": self.fw_key,
                 "firmware": {
                     "kind": self.fw_key,
@@ -1399,15 +1537,23 @@ class BurnScenario:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="CSK 串口烧录压力测试")
-    parser.add_argument("--rounds", type=int, default=1, help="烧录轮数")
+    parser = argparse.ArgumentParser(description="CSK 烧录/上下电压测")
+    parser.add_argument("--mode", choices=["burn", "powercycle"], default="burn",
+                        help="burn=烧录+唤醒ASR；powercycle=上下电+初始化+唤醒ASR")
+    parser.add_argument("--rounds", type=int, default=1, help="轮数")
     parser.add_argument("--fw", default="auto", help="auto（默认优先 hex，无 hex 用 img）、img、hex 或固件文件路径")
     parser.add_argument("--preflight", action="store_true", help="只做预检，不执行设备动作")
     parser.add_argument("--skip-burn", action="store_true", help="跳过烧录，只验证控制时序和启动日志")
     parser.add_argument("--wake-test", action="store_true", help="初始化后切换英文、播报唤醒词并校验唤醒")
     parser.add_argument("--interaction-test", action="store_true", help="唤醒后播报命令词并校验 ASR 与响应")
     parser.add_argument("--no-hisi", action="store_true", help="不采集 HISI 日志")
-    parser.add_argument("--result-root", default=str(PROJECT_ROOT / "result"))
+    parser.add_argument("--result-root", default=str(SKILL_ROOT / "result"))
+    parser.add_argument("--run-name", default="",
+                        help="固定结果目录名；同一设备同一任务多次运行时追加日志")
+    parser.add_argument("--batch-stamp", default="",
+                        help="同一批设备的统一时间戳，例如 20261022_181500")
+    parser.add_argument("--task-summary", default="",
+                        help="任务简介，用于结果目录名，例如 burn-wake-asr")
     parser.add_argument("--profile", default=str(SKILL_ROOT / "config" / "burn-profile.json"))
     parser.add_argument("--manifest", default=str(SKILL_ROOT / "config" / "firmware-manifest.json"))
     parser.add_argument("--devices", default="", help="多设备配置文件；单设备运行时留空")

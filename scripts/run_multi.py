@@ -11,8 +11,10 @@ import csv
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from collections import deque
 from pathlib import Path
@@ -21,13 +23,21 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = SKILL_ROOT.parent
 RUN_PY = SKILL_ROOT / "scripts" / "run.py"
 MAX_DEVICES = 10
+if str(SKILL_ROOT) not in sys.path:
+    sys.path.insert(0, str(SKILL_ROOT))
+
+from lstest.scripts.environment_cleanup import (  # noqa: E402
+    clear_directory,
+    cleanup_temp_files,
+    kill_processes_by_command,
+)
 
 
 def now_human() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def load_devices(path: Path) -> list[dict]:
+def load_devices(path: Path, mode: str = "burn") -> list[dict]:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     devices = [dict(item) for item in payload.get("devices", []) if item.get("enabled", True)]
     if not devices:
@@ -36,6 +46,7 @@ def load_devices(path: Path) -> list[dict]:
         raise ValueError(f"too many enabled devices: {len(devices)} > {MAX_DEVICES}")
     ids: set[str] = set()
     used_ports: dict[str, str] = {}
+    required_roles = ("control", "csk", "burn") if mode == "burn" else ("control", "csk")
     for item in devices:
         device_id = str(item.get("id", "")).strip()
         if not device_id or not re.fullmatch(r"[A-Za-z0-9_.-]+", device_id):
@@ -43,7 +54,7 @@ def load_devices(path: Path) -> list[dict]:
         if device_id in ids:
             raise ValueError(f"duplicate device id: {device_id}")
         ids.add(device_id)
-        for role in ("control", "csk", "burn"):
+        for role in required_roles:
             port = str(item.get(role, "")).strip().upper()
             if not port:
                 raise ValueError(f"{device_id} missing {role} port")
@@ -58,8 +69,13 @@ def load_devices(path: Path) -> list[dict]:
     return devices
 
 
-def result_dir_for(result_root: Path, label: str, rounds: int, before: set[Path] | None = None) -> Path | None:
-    candidates = [p for p in result_root.glob(f"*_cskflashtest_{rounds}_{label}") if p.is_dir()]
+def result_dir_for(result_root: Path, label: str, rounds: int, before: set[Path] | None = None,
+                   prefix: str = "cskflashtest", run_name: str | None = None) -> Path | None:
+    if run_name:
+        fixed = result_root / run_name
+        if fixed.is_dir():
+            return fixed
+    candidates = [p for p in result_root.glob(f"*_{prefix}_{rounds}_{label}") if p.is_dir()]
     if before is not None:
         fresh = [p for p in candidates if p.resolve() not in before]
         if fresh:
@@ -85,8 +101,50 @@ def completed_rounds(result_dir: Path | None) -> int:
         return 0
 
 
+def cleanup_before_run(devices: list[dict]) -> None:
+    """清理上次压测遗留的音频锁、播放进程和临时音频文件。"""
+    clear_directory(PROJECT_ROOT / "logs" / "audio_slots")
+    killed = kill_processes_by_command(
+        [r"listenai_play\.py", r"internal-play-once"],
+        exclude_pids=[os.getpid()],
+    )
+    removed = cleanup_temp_files(Path(tempfile.gettempdir()), "tmp*.wav", 3600)
+    render_keys: set[str] = set()
+    play_script = SKILL_ROOT / "lstest" / "scripts" / "listenai_play.py"
+    if play_script.is_file():
+        try:
+            result = subprocess.run(
+                [sys.executable, "-u", str(play_script), "scan"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            for line in result.stdout.splitlines():
+                if line.startswith("Render"):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        render_keys.add(parts[1])
+        except Exception as exc:
+            print(f"[AUDIO_CLEANUP] scan failed: {type(exc).__name__}: {exc}", flush=True)
+    configured = {
+        str(item.get("render_device_key", ""))
+        for item in devices
+        if item.get("render_device_key")
+    }
+    unused = sorted(render_keys - configured)
+    missing = sorted(configured - render_keys)
+    print(
+        f"[AUDIO_CLEANUP] slots=cleared killed={killed} temp_wav_removed={removed} "
+        f"render={len(render_keys)} unused={unused} missing={missing}",
+        flush=True,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="CSK 多设备并行烧录压测")
+    parser = argparse.ArgumentParser(description="CSK 多设备并行压测")
+    parser.add_argument("--mode", choices=["burn", "powercycle"], default="burn",
+                        help="burn=烧录+唤醒ASR；powercycle=上下电+初始化+唤醒ASR")
     parser.add_argument("--devices", default=str(SKILL_ROOT / "config" / "devices.json"))
     parser.add_argument("--rounds", type=int, default=1)
     parser.add_argument("--max-parallel", type=int, default=MAX_DEVICES)
@@ -95,7 +153,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-hisi", action="store_true")
     parser.add_argument("--wake-test", action="store_true", help="每轮初始化后切换英文并验证唤醒")
     parser.add_argument("--interaction-test", action="store_true", help="唤醒后播报命令词并校验 ASR/响应")
-    parser.add_argument("--result-root", default=str(PROJECT_ROOT / "result"))
+    parser.add_argument("--result-root", default=str(SKILL_ROOT / "result"))
     parser.add_argument("--summary-dir", default="")
     parser.add_argument("--dry-run", action="store_true", help="只校验设备和端口配置，不启动烧录")
     parser.add_argument("--only", default="", help="only run selected devices, comma separated id or label")
@@ -106,12 +164,8 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.rounds <= 0:
         raise SystemExit("--rounds must be > 0")
-    devices = load_devices(Path(args.devices))
-    if args.only:
-        wanted = {item.strip() for item in args.only.split(",") if item.strip()}
-        devices = [item for item in devices if item["id"] in wanted or str(item.get("label", "")) in wanted]
-        if not devices:
-            raise SystemExit(f"no devices matched --only {args.only}")
+    scenario = "cskpowercycle" if args.mode == "powercycle" else "cskflashtest"
+    devices = load_devices(Path(args.devices), args.mode)
     if args.only:
         wanted = {item.strip() for item in args.only.split(",") if item.strip()}
         devices = [item for item in devices if item["id"] in wanted or str(item.get("label", "")) in wanted]
@@ -119,15 +173,20 @@ def main() -> int:
             raise SystemExit(f"no devices matched --only {args.only}")
     max_parallel = max(1, min(MAX_DEVICES, int(args.max_parallel), len(devices)))
     if args.dry_run:
-        print(f"devices={len(devices)} max_parallel={max_parallel}")
+        print(f"mode={args.mode} devices={len(devices)} max_parallel={max_parallel}")
         for item in devices:
-            print(f"  {item['id']}: control={item['control']} csk={item['csk']} burn={item['burn']} hisi={item.get('hisi', '')}")
+            print(f"  {item['id']}: control={item['control']} csk={item['csk']} "
+                  f"burn={item.get('burn', '')} hisi={item.get('hisi', '')}")
         return 0
+
+    cleanup_before_run(devices)
 
     result_root = Path(args.result_root).resolve()
     result_root.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M%S")
-    summary_dir = Path(args.summary_dir) if args.summary_dir else PROJECT_ROOT / "multi_logs" / f"{stamp}_cskflashtest_{args.rounds}_{len(devices)}dev"
+    batch_stamp = stamp
+    task_summary = "burn-wake-asr" if args.mode == "burn" else "powercycle-init-wake-asr"
+    summary_dir = Path(args.summary_dir) if args.summary_dir else SKILL_ROOT / "multi_logs" / f"{stamp}_{scenario}_{args.rounds}_{len(devices)}dev"
     summary_dir.mkdir(parents=True, exist_ok=True)
     summary_path = summary_dir / "summary.csv"
     progress_path = summary_dir / "progress.log"
@@ -151,15 +210,20 @@ def main() -> int:
             while pending and len(running) < max_parallel:
                 device = pending.popleft()
                 label = str(device.get("label") or device["id"])
-                before = {p.resolve() for p in result_root.glob(f"*_cskflashtest_{args.rounds}_{label}")}
+                run_name = f"{batch_stamp}_{scenario}_{device['id']}_{task_summary}_{args.rounds}rounds"
+                before = {p.resolve() for p in result_root.glob(f"*_{scenario}_{args.rounds}_{label}")}
                 log_path = summary_dir / f"{label}.console.log"
                 log_handle = log_path.open("w", encoding="utf-8", newline="\n")
                 cmd = [
                     sys.executable, "-u", str(RUN_PY),
+                    "--mode", args.mode,
                     "--devices", str(Path(args.devices).resolve()),
                     "--device-id", str(device["id"]),
                     "--rounds", str(args.rounds),
                     "--result-root", str(result_root),
+                    "--run-name", run_name,
+                    "--batch-stamp", batch_stamp,
+                    "--task-summary", task_summary,
                 ]
                 if args.fw:
                     cmd += ["--fw", args.fw]
@@ -174,6 +238,7 @@ def main() -> int:
                     process = subprocess.Popen(
                         cmd, cwd=str(PROJECT_ROOT), env=env,
                         stdout=log_handle, stderr=subprocess.STDOUT,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
                 except Exception as exc:
                     log_handle.write(f"launcher failed: {type(exc).__name__}: {exc}\n")
@@ -193,6 +258,7 @@ def main() -> int:
                 running.append({
                     "device": device, "process": process, "log": log_handle,
                     "log_path": log_path, "started": started, "before": before,
+                    "run_name": run_name,
                 })
                 print(f"[{now_human()}] START {device['id']} (parallel {len(running)}/{max_parallel})", flush=True)
                 if pending:
@@ -202,7 +268,9 @@ def main() -> int:
             if now - last_progress >= 30:
                 parts = []
                 for item in running:
-                    rdir = result_dir_for(result_root, str(item["device"].get("label") or item["device"]["id"]), args.rounds, item["before"])
+                    rdir = result_dir_for(result_root, str(item["device"].get("label") or item["device"]["id"]),
+                                          args.rounds, item["before"], prefix=scenario,
+                                          run_name=item.get("run_name"))
                     parts.append(f"{item['device'].get('label', item['device']['id'])}={completed_rounds(rdir)}/{args.rounds}")
                     item["result_dir"] = rdir
                 line = f"{now_human()} PROGRESS " + " ".join(parts)
@@ -219,7 +287,9 @@ def main() -> int:
                 item["log"].close()
                 running.remove(item)
                 device = item["device"]
-                result_dir_path = result_dir_for(result_root, str(device.get("label") or device["id"]), args.rounds, item["before"])
+                result_dir_path = result_dir_for(result_root, str(device.get("label") or device["id"]),
+                                                 args.rounds, item["before"], prefix=scenario,
+                                                 run_name=item.get("run_name"))
                 result_dir = result_dir_path or ""
                 completed = completed_rounds(result_dir_path)
                 status = "PASS" if code == 0 else ("BLOCKED" if code == 2 else "FAIL")

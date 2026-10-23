@@ -34,7 +34,7 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 - `burn/fw.img`：整镜像固件；
 - `fw/V46.99.8_20261020144346/CSK/fw.hex`：hex 固件；
 - `wav/Wake/hellohaier.wav`：唤醒词；
-- `wav/Turn-down-volume/Turn down volume_norm.wav`：交互命令词；
+- `wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav`：交互命令词“打开空调”（Turn on aircon）；
 - `wav/` 下的完整意图语料，供命令词扫描使用。
 
 本仓库已内置运行所需的 `lstest/scripts` 公共运行时；完整 `lstest` 测试和文档不包含。若项目根目录另有 `lstest`，脚本优先使用项目根目录版本。
@@ -98,6 +98,42 @@ cskflashtest\run_multi.bat    # 读取 devices.json 执行多设备压测
 cskflashtest\run_multi.bat --rounds 100 --no-hisi
 cskflashtest\run_multi.bat --rounds 100 --max-parallel 5 --stagger 2
 ```
+
+## 两套压测入口
+
+### 1. 烧录 + 唤醒/ASR
+
+默认模式，入口不变：
+
+```powershell
+python -u scripts/run_multi.py --mode burn --devices config/devices.json --rounds 20 --interaction-test --no-hisi
+run_multi.bat --rounds 20 --interaction-test --no-hisi
+```
+
+结果前缀：`result/<timestamp>_cskflashtest_...`
+
+### 2. 上下电 + CSK 初始化 + 唤醒/ASR
+
+不调用烧录工具，也不占用烧录串口：
+
+```powershell
+python -u scripts/run_multi.py --mode powercycle --devices config/devices.json --rounds 20 --interaction-test --no-hisi
+run_powercycle.bat --rounds 20 --interaction-test --no-hisi
+preflight_powercycle.bat
+```
+
+单轮时序：
+
+1. `uut-csk-boot.off`：确保退出 boot；
+2. `uut-switch1.off`：断电；
+3. 等待 `pre_burn_wait_s`；
+4. `uut-switch1.on`：上电；
+5. 等待 `AP Boot Ready !!!`；
+6. 设置 `flash.setloglev 4`；
+7. 唤醒 + ASR 交互（如启用）。
+
+结果前缀：`result/<timestamp>_cskpowercycle_...`
+多设备唤醒仍受 `audio_lock.slots=4` 限制，最多 4 台同时播报。
 
 ## CSK 初始化完成标记
 
@@ -193,31 +229,30 @@ python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json
 
 - 使用 `wake.render_device_key` 指定的声卡，不回落系统默认声卡；
 - 初始化完成后切换英文 `algo.switch.lang 0`，再播报唤醒词；
-- 每次唤醒失败最多尝试 5 次，每轮把失败次数写入 `wake_failures` / `wake.failed_attempts`；
-- 5 次均失败时本轮 `wake_result=FAIL`，但不会中断后续轮次；
+- 每次唤醒失败最多尝试 4 次（首次 + 3 次重试），每轮把失败次数写入 `wake_failures` / `wake.failed_attempts`；
+- 4 次均失败时本轮 `wake_result=FAIL`，但不会中断后续轮次；
 - 多设备可加 `--wake-test`：`run_multi.bat --rounds 1 --wake-test`。
 
 ## 命令词交互校验
 
-唤醒成功后播报命令词 `Turn down volume`（已转换为 16k 单声道 WAV，并使用归一化版本）：
+唤醒成功后播报命令词“打开空调”：
 
 ```text
-wav/Turn-down-volume/Turn down volume.wav
-wav/Turn-down-volume/Turn down volume_norm.wav
+wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav
 ```
 
-期望结果：
+ASR 结果按三态判定：
 
-```text
-keyword:Turn down volume
-vir_kid:78
-refresh volume from <before> to <after>
-```
+- `correct`：命中 `keyword:Turn on aircon`，PASS；
+- `misrecognized`：有 `keyword:` 结果但不是 `Turn on aircon`（例如 `Turn on ECO`），PASS，仅记录误识别，不重试；
+- `no_result`：完全没有 `keyword:` 结果，FAIL，允许重新唤醒后再识别。
 
-- 校验 ASR 关键词、`vir_kid` 和音量变化；
-- 默认要求音量下降，例如 `70 -> 60`；
-- 设备侧响应日志包含 `_volume_adjust` / 音量调整提示音；
-- 实测结果：`Turn down volume` 识别正确，音量 `70 -> 60`。
+规则：
+
+- 每轮只要求一次成功唤醒 + 一次识别结果；
+- 唤醒失败或无识别结果才重试，最多 4 次（首次 + 3 次重试）；
+- 误识别不重试；
+- 不再校验音量变化，`vir_kid` 仅记录。
 
 命令：
 
@@ -227,11 +262,29 @@ python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json
 
 `--interaction-test` 会自动启用唤醒测试；多设备时加 `--interaction-test`，并为每台设备配置自己的 `render_device_key`。
 
-低音量边界：
+## 压测前初始化清理
 
-- 实测音量 `40 -> 30`、`30 -> 20` 后设备出现 `Boot Reason: CRASH 0x30`，这不是正常的“最小音量”响应；
-- 为避免重复触发固件崩溃，`interaction.min_volume` 默认 40：启动后音量不高于 40 时跳过降音量命令，记录 `volume_boundary=PASS`；
-- 交互日志若出现 `Boot Reason: CRASH` / `CSK AP Ready after exception`，会按设备异常记录，不会被当作正常音量响应。
+`run_multi.py` 启动前自动调用 `lstest/scripts/environment_cleanup.py`：
+
+- 清空 `logs/audio_slots`；
+- 杀掉残留的 `listenai_play.py` / `internal-play-once` 进程；
+- 删除过期的临时音频；
+- 扫描 Render 端点，记录未使用/缺失的声卡 Key。
+
+## 串口断开重连
+
+控制口无提示符时，`run.py` 调用 `lstest/scripts/serial_recovery.py`：
+
+- 最多 20 次重开；
+- 等待从 0.5s 起逐步延长到 30s；
+- 每次用 3s 探测 `root:/$`；
+- 全部失败才判 `control_alive` FAIL，连续 3 轮失败停止任务。
+
+## 结果目录命名
+
+`<批次时间戳>_<场景>_<设备ID>_<任务简介>_<总次数>rounds`
+
+同一批设备共用批次时间戳；同一设备同一任务多次运行追加到同一目录。
 
 ## 烧录成功判定
 

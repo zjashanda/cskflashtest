@@ -382,6 +382,7 @@ class BurnToolRunner:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 bufsize=0,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except Exception as exc:
             return BurnResult(-1, False, 0, [], f"{type(exc).__name__}: {exc}")
