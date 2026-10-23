@@ -28,6 +28,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from lstest.scripts.environment_cleanup import (  # noqa: E402
+    KillOnCloseJob,
     clear_directory,
     cleanup_temp_files,
     kill_processes_by_command,
@@ -225,6 +226,8 @@ def main() -> int:
 
     pending = deque(devices)
     running: list[dict] = []
+    job = KillOnCloseJob()
+    job.create()
     register_process_cleanup(lambda: [item.get("process") for item in running])
 
     env = dict(os.environ)
@@ -313,6 +316,7 @@ def main() -> int:
                     summary.flush()
                     print(f"[{now_human()}] START_FAILED {device['id']}: {exc}", flush=True)
                     continue
+                job.assign(process)
                 running.append({
                     "device": device, "process": process, "log": log_handle,
                     "log_path": log_path, "started": started, "before": before,
