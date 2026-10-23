@@ -99,6 +99,23 @@ cskflashtest\run_multi.bat --rounds 100 --no-hisi
 cskflashtest\run_multi.bat --rounds 100 --max-parallel 5 --stagger 2
 ```
 
+### 手动验收脚本（单设备，终端实时输出）
+
+```text
+verify_burn.bat [轮数] [设备ID] [验收模式]
+verify_powercycle.bat [轮数] [设备ID] [验收模式]
+```
+
+示例：
+
+```powershell
+verify_powercycle.bat 3 dev01 any_asr
+verify_powercycle.bat 3 dev01 any_asr_playback
+verify_burn.bat 1 dev01 strict
+```
+
+终端会实时输出：轮次、上下电、CSK 启动、log level、唤醒、识别结果、播报检查和本轮判定。
+
 ## 两套压测入口
 
 ### 1. 烧录 + 唤醒/ASR
