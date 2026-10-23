@@ -118,6 +118,13 @@ verify_burn.bat 1 strict
 
 终端会按设备标签实时输出：轮次、上下电、CSK 启动、log level、唤醒、识别结果、播报检查和本轮判定。
 
+每轮结束额外输出：
+
+- `[STATS] ...`：当前设备的累计 `pass/fail` 和 `hit/misheard/empty/asleep`。
+- `[TOTAL] ...`：当前所有设备的累计 `pass/fail` 和四态统计。
+
+任务结束输出 `[OUTCOME]` 表格，并写入 `summary_outcomes.csv`（按设备统计轮数、成功、失败、四态、多结果和平均单轮耗时）。
+
 ## 两套压测入口
 
 ### 1. 烧录 + 唤醒/ASR

@@ -190,6 +190,7 @@ class BurnScenario:
             args.wake_test = True
             args.interaction_test = self.acceptance_mode not in {"wake_only", "wake_playback"}
         self._asr_result_seen = False
+        self._last_round_stats: dict = {}
         self.verification = dict(self.manifest.get("verification", {}))
         self.ports = dict(self.manifest.get("ports", {}))
         self.device_id = ""
@@ -1054,6 +1055,7 @@ class BurnScenario:
     def run_round(self, index: int) -> str:
         assert self.artifacts is not None and self.runtime is not None and self.control is not None and self.csk is not None
         case_id = f"{self.case_prefix}_{index:04d}"
+        self._last_round_stats = {}
         required_facts = ["COMMAND_ACK", "COMMAND_EVIDENCE", "RESTART", "INIT_READY"]
         if self.args.wake_test:
             required_facts.append("WAKE")
@@ -1606,6 +1608,17 @@ class BurnScenario:
                     self._infra_streak = 0
             else:
                 self._infra_streak = 0
+        self._last_round_stats = {
+            "round": index,
+            "status": status,
+            "outcome": round_outcome,
+            "wake_results": list(wake_results),
+            "asr_results": list(asr_results),
+            "multi_wake": bool(wake_details.get("multi_wake", False)),
+            "multi_asr": bool(interaction_details.get("multi_asr", False)),
+            "multi_result": bool(multi_result),
+            "asr_skipped": bool(asr_skipped),
+        }
         return status
 
     # ---------- main ----------
@@ -1627,6 +1640,11 @@ class BurnScenario:
             print(f"[{now_human()}] PREFLIGHT PASS: {summary['result_directory']}", flush=True)
             return 0
 
+        stats = {
+            "rounds": 0, "pass": 0, "fail": 0,
+            "hit": 0, "misheard": 0, "empty": 0, "asleep": 0,
+            "multi_wake": 0, "multi_asr": 0, "multi_result": 0,
+        }
         try:
             self.start_collectors()
             for index in range(1, self.args.rounds + 1):
@@ -1634,8 +1652,9 @@ class BurnScenario:
                 if stop_reason:
                     self._emit("SYSTEM", "STOP_REQUESTED", f"收到停止请求: {stop_reason}", level="WARN", status="STOP")
                     break
+                round_status = "FAIL"
                 try:
-                    self.run_round(index)
+                    round_status = self.run_round(index)
                 except Exception as exc:
                     self._current_case = ""
                     try:
@@ -1648,6 +1667,33 @@ class BurnScenario:
                         )
                     except Exception:
                         pass
+                last = dict(self._last_round_stats or {})
+                stats["rounds"] += 1
+                if round_status == "PASS":
+                    stats["pass"] += 1
+                else:
+                    stats["fail"] += 1
+                outcome = str(last.get("outcome") or "empty")
+                if outcome in {"hit", "misheard", "empty", "asleep"}:
+                    stats[outcome] += 1
+                if last.get("multi_wake"):
+                    stats["multi_wake"] += 1
+                if last.get("multi_asr"):
+                    stats["multi_asr"] += 1
+                if last.get("multi_result"):
+                    stats["multi_result"] += 1
+                print(
+                    f"[STATS] round={index}/{self.args.rounds} status={round_status} "
+                    f"outcome={outcome} wake_results={len(last.get('wake_results', []))} "
+                    f"asr_results={len(last.get('asr_results', []))} "
+                    f"multi_wake={bool(last.get('multi_wake'))} "
+                    f"multi_asr={bool(last.get('multi_asr'))} "
+                    f"| pass={stats['pass']} fail={stats['fail']} "
+                    f"hit={stats['hit']} misheard={stats['misheard']} "
+                    f"empty={stats['empty']} asleep={stats['asleep']} "
+                    f"multi_result={stats['multi_result']}",
+                    flush=True,
+                )
                 if self._infra_streak >= 3:
                     self.artifacts.request_stop("INFRASTRUCTURE_UNAVAILABLE", "连续 3 轮控制/CSK 基础设施异常")
                     break
@@ -1665,6 +1711,14 @@ class BurnScenario:
         finally:
             self.stop_collectors()
 
+        print(
+            f"[STATS] FINAL mode={self.acceptance_mode} rounds={stats['rounds']} "
+            f"pass={stats['pass']} fail={stats['fail']} hit={stats['hit']} "
+            f"misheard={stats['misheard']} empty={stats['empty']} asleep={stats['asleep']} "
+            f"multi_wake={stats['multi_wake']} multi_asr={stats['multi_asr']} "
+            f"multi_result={stats['multi_result']}",
+            flush=True,
+        )
         counts = dict(self.artifacts.counts)
         failed = counts.get("FAIL", 0)
         passed = counts.get("PASS", 0)

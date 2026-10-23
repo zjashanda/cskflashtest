@@ -18,6 +18,7 @@ import tempfile
 import threading
 import time
 from collections import deque
+from datetime import datetime
 from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -101,6 +102,90 @@ def completed_rounds(result_dir: Path | None) -> int:
             return max(0, sum(1 for _ in csv.DictReader(handle)))
     except OSError:
         return 0
+
+
+def summarize_result_dir(result_dir: Path | None) -> dict:
+    summary = {
+        "rounds": 0, "pass": 0, "fail": 0,
+        "hit": 0, "misheard": 0, "empty": 0, "asleep": 0,
+        "multi_wake": 0, "multi_asr": 0, "multi_result": 0,
+        "avg_round_s": 0.0,
+    }
+    if result_dir is None:
+        return summary
+    path = Path(result_dir) / "results.csv"
+    if not path.exists():
+        return summary
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            records = list(csv.DictReader(handle))
+    except OSError:
+        return summary
+
+    durations: list[float] = []
+    for record in records:
+        summary["rounds"] += 1
+        status = str(record.get("final_status", "")).upper()
+        if status == "PASS":
+            summary["pass"] += 1
+        elif status == "FAIL":
+            summary["fail"] += 1
+        outcome = str(record.get("round_outcome", "")).strip().lower()
+        if outcome in {"hit", "misheard", "empty", "asleep"}:
+            summary[outcome] += 1
+        try:
+            if int(record.get("wake_result_count") or 0) > 1:
+                summary["multi_wake"] += 1
+            if int(record.get("asr_result_count") or 0) > 1:
+                summary["multi_asr"] += 1
+        except ValueError:
+            pass
+        if str(record.get("multi_result", "")).strip().lower() in {"true", "1", "yes"}:
+            summary["multi_result"] += 1
+        try:
+            start = datetime.fromisoformat(str(record.get("started_at", "")).replace("Z", "+00:00"))
+            end = datetime.fromisoformat(str(record.get("ended_at", "")).replace("Z", "+00:00"))
+            if start.tzinfo is not None:
+                start = start.astimezone().replace(tzinfo=None)
+            if end.tzinfo is not None:
+                end = end.astimezone().replace(tzinfo=None)
+            durations.append((end - start).total_seconds())
+        except (TypeError, ValueError):
+            pass
+    if durations:
+        summary["avg_round_s"] = round(sum(durations) / len(durations), 1)
+    return summary
+
+
+def aggregate_summaries(items: list[dict]) -> dict:
+    total = {
+        "rounds": 0, "pass": 0, "fail": 0,
+        "hit": 0, "misheard": 0, "empty": 0, "asleep": 0,
+        "multi_wake": 0, "multi_asr": 0, "multi_result": 0,
+        "avg_round_s": 0.0,
+    }
+    weighted = 0.0
+    for item in items:
+        rounds = int(item.get("rounds", 0) or 0)
+        for key in (
+            "rounds", "pass", "fail", "hit", "misheard", "empty", "asleep",
+            "multi_wake", "multi_asr", "multi_result",
+        ):
+            total[key] += int(item.get(key, 0) or 0)
+        weighted += float(item.get("avg_round_s", 0.0) or 0.0) * rounds
+    if total["rounds"]:
+        total["avg_round_s"] = round(weighted / total["rounds"], 1)
+    return total
+
+
+def total_line(total: dict, completed: int, planned: int, suffix: str = "") -> str:
+    line = (
+        f"[TOTAL] rounds={completed}/{planned} pass={total['pass']} fail={total['fail']} "
+        f"hit={total['hit']} misheard={total['misheard']} empty={total['empty']} "
+        f"asleep={total['asleep']} multi_wake={total['multi_wake']} "
+        f"multi_asr={total['multi_asr']} multi_result={total['multi_result']}"
+    )
+    return f"{line} {suffix}".rstrip()
 
 
 def cleanup_before_run(devices: list[dict]) -> None:
@@ -198,6 +283,9 @@ def main() -> int:
     progress_handle = progress_path.open("w", encoding="utf-8", newline="\n")
     rows: list[dict] = []
     last_progress = time.monotonic()
+    planned_rounds = len(devices) * args.rounds
+    last_live_rounds = 0
+    last_live_poll = 0.0
     pending = deque(devices)
     running: list[dict] = []
     env = dict(os.environ)
@@ -296,6 +384,36 @@ def main() -> int:
                     time.sleep(max(0.0, args.stagger))
 
             now = time.monotonic()
+            if now - last_live_poll >= 0.5:
+                live_dirs: list[Path] = []
+                for item in running:
+                    rdir = result_dir_for(result_root, str(item["device"].get("label") or item["device"]["id"]),
+                                          args.rounds, item["before"], prefix=scenario,
+                                          run_name=item.get("run_name"))
+                    item["result_dir"] = rdir
+                    if rdir is not None:
+                        live_dirs.append(rdir)
+                for row in rows:
+                    if row.get("result_dir"):
+                        live_dirs.append(Path(row["result_dir"]))
+                unique_dirs: list[Path] = []
+                seen_dirs: set[str] = set()
+                for path in live_dirs:
+                    try:
+                        key = str(path.resolve())
+                    except OSError:
+                        key = str(path)
+                    if key not in seen_dirs:
+                        seen_dirs.add(key)
+                        unique_dirs.append(path)
+                summaries = [summarize_result_dir(path) for path in unique_dirs]
+                total = aggregate_summaries(summaries)
+                completed = total["rounds"]
+                if completed != last_live_rounds:
+                    print(total_line(total, completed, planned_rounds), flush=True)
+                    last_live_rounds = completed
+                last_live_poll = now
+
             if now - last_progress >= 30:
                 parts = []
                 for item in running:
@@ -354,6 +472,54 @@ def main() -> int:
     print(f"[{now_human()}] summary: {summary_path}", flush=True)
     for row in rows:
         print(f"  {row.get('label', row['device_id'])}: {row['status']} completed={row['completed']}/{row['rounds']} {row['result_dir']}", flush=True)
+
+    final_summaries: list[tuple[dict, dict]] = []
+    for row in rows:
+        result_dir = Path(row["result_dir"]) if row.get("result_dir") else None
+        final_summaries.append((row, summarize_result_dir(result_dir)))
+
+    outcomes_path = summary_dir / "summary_outcomes.csv"
+    with outcomes_path.open("w", encoding="utf-8-sig", newline="") as outcomes_handle:
+        outcomes_writer = csv.DictWriter(outcomes_handle, fieldnames=[
+            "device_id", "label", "status", "rounds", "pass", "fail",
+            "hit", "misheard", "empty", "asleep",
+            "multi_wake", "multi_asr", "multi_result", "avg_round_s", "result_dir",
+        ])
+        outcomes_writer.writeheader()
+        for row, item in final_summaries:
+            outcomes_writer.writerow({
+                "device_id": row["device_id"],
+                "label": row.get("label", ""),
+                "status": row["status"],
+                "rounds": item["rounds"],
+                "pass": item["pass"],
+                "fail": item["fail"],
+                "hit": item["hit"],
+                "misheard": item["misheard"],
+                "empty": item["empty"],
+                "asleep": item["asleep"],
+                "multi_wake": item["multi_wake"],
+                "multi_asr": item["multi_asr"],
+                "multi_result": item["multi_result"],
+                "avg_round_s": item["avg_round_s"],
+                "result_dir": row.get("result_dir", ""),
+            })
+        outcomes_handle.flush()
+
+    total = aggregate_summaries([item for _, item in final_summaries])
+    print("[OUTCOME] device rounds pass fail hit misheard empty asleep multi_wake multi_asr avg_s", flush=True)
+    for row, item in final_summaries:
+        print(
+            f"  {row['device_id']}: {item['rounds']}/{row['rounds']} "
+            f"pass={item['pass']} fail={item['fail']} "
+            f"hit={item['hit']} misheard={item['misheard']} "
+            f"empty={item['empty']} asleep={item['asleep']} "
+            f"multi_wake={item['multi_wake']} multi_asr={item['multi_asr']} "
+            f"avg={item['avg_round_s']}s",
+            flush=True,
+        )
+    print(total_line(total, total["rounds"], planned_rounds, suffix="FINAL"), flush=True)
+    print(f"outcomes: {outcomes_path}", flush=True)
     return 0 if all(row["returncode"] == 0 for row in rows) else 1
 
 
