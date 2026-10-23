@@ -386,7 +386,10 @@ class BurnScenario:
         self.artifacts = TaskArtifacts(
             self.result_root,
             self.task_slug,
-            detail_fields=("round_outcome", "acceptance_mode", "asr_skipped"),
+            detail_fields=(
+                "round_outcome", "acceptance_mode", "asr_skipped",
+                "wake_result_count", "asr_result_count", "wake_results", "asr_results", "multi_result",
+            ),
             run_name=self.run_name,
             append=True,
         )
@@ -751,6 +754,11 @@ class BurnScenario:
             playback_observed = has_start or (not self.require_spk_marker and has_miniplayer)
             playback_count = control_text.count(start_pattern) or csk_text.count("miniplayer status: PLAYING")
             playback_complete = (stop_pattern in control_text) or ("miniplayer status: COMPLETE" in csk_text)
+            wake_results = [
+                str(value).strip()
+                for value in re.findall(r"keyword:\s*([^\"\r\n]+)", csk_text)
+                if str(value).strip()
+            ]
             details["attempts"].append({
                 "attempt": attempt,
                 "playback_start": has_start,
@@ -759,6 +767,8 @@ class BurnScenario:
                 "playback_count": playback_count,
                 "playback_complete": playback_complete,
                 "wake": has_wake,
+                "wake_results": wake_results,
+                "wake_result_count": len(wake_results),
                 "reset": reset,
                 "play_output": play_output[-500:],
                 "wake_lines": [
@@ -801,6 +811,13 @@ class BurnScenario:
         )
         details["wake_playback_count"] = int(successful.get("playback_count", 0) or 0)
         details["wake_playback_complete"] = bool(successful.get("playback_complete", False))
+        details["wake_results"] = [
+            value for item in details["attempts"] for value in item.get("wake_results", [])
+        ]
+        details["wake_result_count"] = len(details["wake_results"])
+        details["multi_wake"] = any(
+            int(item.get("wake_result_count", 0) or 0) > 1 for item in details["attempts"]
+        )
         if not language_ok:
             last_reason = "英文切换未确认: " + language_text[-200:]
         if not details["success"]:
@@ -876,13 +893,15 @@ class BurnScenario:
             reset = crash or "bootloader application" in csk_text
 
             asr_pattern = str(cfg.get("asr_pattern", "")).strip()
+            asr_results: list[str] = []
             actual_keyword = ""
             if asr_pattern:
                 for match in re.finditer(asr_pattern, csk_text, re.I):
                     value = (match.groupdict().get("keyword") or match.group(0)).strip()
                     if value and value.upper() != "HELLO HAIER":
+                        asr_results.append(value)
                         actual_keyword = value
-            keyword_present = bool(actual_keyword)
+            keyword_present = bool(asr_results)
             keyword_correct = bool(expected) and expected.lower() in actual_keyword.lower()
             misrecognized = keyword_present and not keyword_correct
             outcome = "hit" if keyword_correct else ("misheard" if misrecognized else "empty")
@@ -930,6 +949,9 @@ class BurnScenario:
                 "asr_response_count": asr_response_count,
                 "asr_playback_count": asr_playback_count,
                 "asr_playback_complete": asr_playback_complete,
+                "asr_results": asr_results,
+                "asr_result_count": len(asr_results),
+                "multi_asr": len(asr_results) > 1,
                 "keyword": actual_keyword,
                 "vir_kid": int(kid_match.group(1)) if kid_match else None,
                 "reset": reset,
@@ -962,6 +984,11 @@ class BurnScenario:
         details["asr_response_count"] = int(last.get("asr_response_count", 0) or 0)
         details["asr_playback_count"] = int(last.get("asr_playback_count", 0) or 0)
         details["asr_playback_complete"] = bool(last.get("asr_playback_complete", False))
+        details["asr_results"] = [
+            value for item in details["attempts"] for value in item.get("asr_results", [])
+        ]
+        details["asr_result_count"] = len(details["asr_results"])
+        details["multi_asr"] = any(bool(item.get("multi_asr", False)) for item in details["attempts"])
         reason = (
             f"ASR={expected}, attempts={len(details['attempts'])}/{attempts}, "
             f"result={outcome}, actual={last.get('keyword') or '-'}, reset={last.get('reset')}"
@@ -1075,6 +1102,9 @@ class BurnScenario:
         interaction_details: dict = {}
         round_outcome = "empty"
         asr_skipped = self.acceptance_mode in {"wake_only", "wake_playback"}
+        wake_results: list[str] = []
+        asr_results: list[str] = []
+        multi_result = False
         burn_result = None
         burn_events: list[LineEvent] = []
         boot_events: list[LineEvent] = []
@@ -1335,6 +1365,7 @@ class BurnScenario:
                         status="PASS" if wake_ok else "FAIL",
                         raw={"wake_failures": wake_failures, "max_attempts": max_attempts},
                     )
+                    wake_results = list(wake_details.get("wake_results", []) or [])
 
                     def acceptance():
                         return evaluate_round(
@@ -1345,6 +1376,10 @@ class BurnScenario:
                             asr_response_count=int(interaction_details.get("asr_response_count", 0) or 0),
                             asr_playback_count=int(interaction_details.get("asr_playback_count", 0) or 0),
                             asr_playback_complete=bool(interaction_details.get("asr_playback_complete", False)),
+                            multi_result=bool(
+                                wake_details.get("multi_wake", False)
+                                or interaction_details.get("multi_asr", False)
+                            ),
                         )
 
                     if self.args.interaction_test:
@@ -1391,6 +1426,7 @@ class BurnScenario:
                                 keyword_ok, response_ok, interaction_reason, interaction_evidence, interaction_details = self.run_interaction_test()
                                 attempts = interaction_details.get("attempts", []) if interaction_details else []
                                 round_outcome = str(attempts[-1].get("outcome", "empty")) if attempts else "empty"
+                                asr_results = list(interaction_details.get("asr_results", []) or [])
                                 if round_outcome in {"hit", "misheard"}:
                                     self._asr_result_seen = True
                                 self._emit(
@@ -1418,6 +1454,27 @@ class BurnScenario:
                         add_check(
                             "interaction_acceptance", accepted, accept_reason, [],
                             outcome=round_outcome, mode=self.acceptance_mode,
+                        )
+                    multi_result = bool(
+                        wake_details.get("multi_wake", False)
+                        or interaction_details.get("multi_asr", False)
+                    )
+                    if multi_result:
+                        if wake_details.get("multi_wake") and interaction_details.get("multi_asr"):
+                            code = "MULTI_RESULT"
+                        elif wake_details.get("multi_wake"):
+                            code = "MULTI_WAKE"
+                        else:
+                            code = "MULTI_ASR"
+                        self.artifacts.record_anomaly(
+                            code, "单轮出现多个唤醒或识别结果",
+                            case_id=case_id, wake_results=wake_results, asr_results=asr_results,
+                        )
+                        self._emit(
+                            "SYSTEM", "MULTI_RESULT",
+                            f"{code}: 单轮出现多个唤醒或识别结果",
+                            case_id=case_id, level="WARN", status="WARN",
+                            raw={"wake_results": wake_results, "asr_results": asr_results},
                         )
         except Exception as exc:
             exception_text = f"{type(exc).__name__}: {exc}"
@@ -1484,6 +1541,11 @@ class BurnScenario:
                 "round_outcome": round_outcome,
                 "acceptance_mode": self.acceptance_mode,
                 "asr_skipped": asr_skipped,
+                "wake_results": wake_results,
+                "asr_results": asr_results,
+                "wake_result_count": len(wake_results),
+                "asr_result_count": len(asr_results),
+                "multi_result": multi_result,
                 "input_text": self.fw_key,
                 "firmware": {
                     "kind": self.fw_key,

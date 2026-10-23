@@ -34,6 +34,7 @@ MODES = {
         "asr_result": "strict",
         "asr_playback": False,
         "require_any_asr": True,
+        "reject_multi_result": True,
     },
     "strict_playback": {
         "label": "严格词表+播报验收",
@@ -41,6 +42,7 @@ MODES = {
         "asr_result": "strict",
         "asr_playback": True,
         "require_any_asr": True,
+        "reject_multi_result": True,
     },
     "any_asr": {
         "label": "任意识别验收",
@@ -86,6 +88,7 @@ def evaluate_round(
     asr_response_count: int = 0,
     asr_playback_count: int = 0,
     asr_playback_complete: bool = False,
+    multi_result: bool = False,
 ) -> tuple[bool, str]:
     """按单轮交互结果和播报旁证判断本轮是否通过。"""
     config = MODES.get(mode)
@@ -95,6 +98,8 @@ def evaluate_round(
         return False, f"未知交互结果: {outcome}"
     if outcome == "asleep":
         return False, "未唤醒"
+    if config.get("reject_multi_result") and multi_result:
+        return False, "单轮出现多个唤醒或识别结果"
 
     result_mode = config["asr_result"]
     if result_mode == "strict" and outcome != "hit":

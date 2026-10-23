@@ -250,22 +250,25 @@ wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav
 
 验收模式通过 `--acceptance` 选择（默认 `any_asr`）：
 
-| 模式 | 唤醒 | 唤醒播报 | ASR 结果 | 识别响应/播报 |
-|---|---|---|---|---|
-| `wake_only` | 要求 | 不检查 | 不检查 | 不检查 |
-| `wake_playback` | 要求 | 至少 1 次完整播报 | 不检查 | 不检查 |
-| `strict` | 要求 | 不检查 | 只接受 `hit` | 不检查 |
-| `strict_playback` | 要求 | 至少 1 次完整播报 | 只接受 `hit` | 要求响应 + 至少 1 次完整播报 |
-| `any_asr` | 要求 | 不检查 | `hit` / `misheard` | 不检查 |
-| `any_asr_playback` | 要求 | 至少 1 次完整播报 | `hit` / `misheard` | 要求响应 + 至少 1 次完整播报 |
-| `asr_optional` | 要求 | 不检查 | `hit` / `misheard` / `empty`；整轮任务至少一次非空 | 不检查 |
-| `asr_optional_playback` | 要求 | 至少 1 次完整播报 | `hit` / `misheard` / `empty`；整轮任务至少一次非空 | 有识别结果的轮次要求响应 + 至少 1 次完整播报 |
+| 模式 | 唤醒 | 唤醒播报 | ASR 结果 | 识别响应/播报 | 多唤醒/多识别 |
+|---|---|---|---|---|---|
+| `wake_only` | 要求 | 不检查 | 不检查 | 不检查 | 记录 |
+| `wake_playback` | 要求 | 至少 1 次完整播报 | 不检查 | 不检查 | 记录 |
+| `strict` | 要求 | 不检查 | 只接受 `hit` | 不检查 | **FAIL** |
+| `strict_playback` | 要求 | 至少 1 次完整播报 | 只接受 `hit` | 要求响应 + 至少 1 次完整播报 | **FAIL** |
+| `any_asr` | 要求 | 不检查 | `hit` / `misheard` | 不检查 | 记录 |
+| `any_asr_playback` | 要求 | 至少 1 次完整播报 | `hit` / `misheard` | 要求响应 + 至少 1 次完整播报 | 记录 |
+| `asr_optional` | 要求 | 不检查 | `hit` / `misheard` / `empty`；整轮任务至少一次非空 | 不检查 | 记录 |
+| `asr_optional_playback` | 要求 | 至少 1 次完整播报 | `hit` / `misheard` / `empty`；整轮任务至少一次非空 | 有识别结果的轮次要求响应 + 至少 1 次完整播报 | 记录 |
 
 规则：
 
 - 以上都是**单轮交互**判定；`asr_optional` 的“至少一次非空”是额外的任务级约束；
+- 单轮内所有唤醒结果和识别结果都记录到 `wake_results` / `asr_results`，并统计次数；
+- 一次播放出现多个唤醒结果或多个识别结果时，记录 `MULTI_WAKE` / `MULTI_ASR` / `MULTI_RESULT` 异常；
+- `strict` / `strict_playback` 遇到多结果直接 FAIL；其他模式只记录，不影响本轮通过；
 - 唤醒播报默认按 1 次检查；
-- 识别播报允许多次，每次要求 PLAYING → COMPLETE 或 start → stop；
+- 识别播报允许 1 次或多次，每次要求 PLAYING → COMPLETE 或 start → stop；
 - 唤醒失败或无识别结果才重试，最多 4 次（首次 + 3 次重试）；
 - 误识别不重试；
 - 不再校验音量变化，`vir_kid` 仅记录；
