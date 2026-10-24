@@ -164,6 +164,33 @@ def kill_processes_by_command(patterns: Iterable[str], *, exclude_pids: Iterable
     return len([line for line in result.stdout.splitlines() if line.strip()])
 
 
+def find_processes_by_command(patterns: Iterable[str], *, exclude_pids: Iterable[int] = ()) -> list[int]:
+    """返回命令行匹配的 Python 进程 PID；仅 Windows，其他平台返回空列表。"""
+    if os.name != "nt":
+        return []
+    pattern = "|".join(item for item in patterns if item)
+    if not pattern:
+        return []
+    excluded = ",".join(str(int(pid)) for pid in exclude_pids)
+    exclude_clause = f" -and $_.ProcessId -notin @({excluded})" if excluded else ""
+    script = (
+        "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+        f"Where-Object {{ $_.CommandLine -match '{pattern}'{exclude_clause} }} | "
+        "ForEach-Object { $_.ProcessId }"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=CREATE_NO_WINDOW,
+        )
+    except Exception:
+        return []
+    return [int(line.strip()) for line in result.stdout.splitlines() if line.strip().isdigit()]
+
+
 def kill_process_tree(pid: int) -> bool:
     """终止指定 PID 及其子进程树；Windows 使用 taskkill /T /F。"""
     try:

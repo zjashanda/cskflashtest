@@ -31,6 +31,7 @@ from lstest.scripts.environment_cleanup import (  # noqa: E402
     KillOnCloseJob,
     clear_directory,
     cleanup_temp_files,
+    find_processes_by_command,
     kill_processes_by_command,
     register_process_cleanup,
 )
@@ -113,6 +114,16 @@ def completed_rounds(result_dir: Path | None) -> int:
 
 def cleanup_before_run(devices: list[dict]) -> None:
     """清理上次压测遗留的音频锁、播放进程和临时音频文件。"""
+    active = find_processes_by_command(
+        [r"scripts[\\/]run\.py", r"run_multi\.py"],
+        exclude_pids=[os.getpid()],
+    )
+    if active:
+        print(
+            f"[AUDIO_CLEANUP] active stress run detected ({len(active)} processes); aborting",
+            flush=True,
+        )
+        raise SystemExit(2)
     clear_directory(PROJECT_ROOT / "logs" / "audio_slots")
     killed = kill_processes_by_command(
         [r"listenai_play\.py", r"internal-play-once"],
