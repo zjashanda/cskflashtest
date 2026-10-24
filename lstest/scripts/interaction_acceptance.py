@@ -79,6 +79,11 @@ def mode_label(mode: str) -> str:
     return str(MODES.get(mode, {}).get("label", mode))
 
 
+def rejects_multi_result(mode: str) -> bool:
+    """只有显式声明 reject_multi_result 的模式才把多结果判为失败。"""
+    return bool(MODES.get(mode, {}).get("reject_multi_result", False))
+
+
 def evaluate_round(
     outcome: str,
     mode: str,

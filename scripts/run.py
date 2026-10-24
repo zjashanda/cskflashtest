@@ -38,6 +38,7 @@ from lstest.scripts.interaction_acceptance import (  # noqa: E402
     evaluate_round,
     evaluate_run,
     mode_label,
+    rejects_multi_result,
 )
 from lstest.scripts.runtime import ScenarioRuntime  # noqa: E402
 from lstest.scripts.serial_recovery import recover_serial  # noqa: E402
@@ -1107,6 +1108,7 @@ class BurnScenario:
         wake_results: list[str] = []
         asr_results: list[str] = []
         multi_result = False
+        multi_code = ""
         burn_result = None
         burn_events: list[LineEvent] = []
         boot_events: list[LineEvent] = []
@@ -1463,18 +1465,19 @@ class BurnScenario:
                     )
                     if multi_result:
                         if wake_details.get("multi_wake") and interaction_details.get("multi_asr"):
-                            code = "MULTI_RESULT"
+                            multi_code = "MULTI_RESULT"
                         elif wake_details.get("multi_wake"):
-                            code = "MULTI_WAKE"
+                            multi_code = "MULTI_WAKE"
                         else:
-                            code = "MULTI_ASR"
-                        self.artifacts.record_anomaly(
-                            code, "单轮出现多个唤醒或识别结果",
-                            case_id=case_id, wake_results=wake_results, asr_results=asr_results,
-                        )
+                            multi_code = "MULTI_ASR"
+                        if rejects_multi_result(self.acceptance_mode):
+                            self.artifacts.record_anomaly(
+                                multi_code, "单轮出现多个唤醒或识别结果",
+                                case_id=case_id, wake_results=wake_results, asr_results=asr_results,
+                            )
                         self._emit(
                             "SYSTEM", "MULTI_RESULT",
-                            f"{code}: 单轮出现多个唤醒或识别结果",
+                            f"{multi_code}: 单轮出现多个唤醒或识别结果（{self.acceptance_mode} 仅记录）",
                             case_id=case_id, level="WARN", status="WARN",
                             raw={"wake_results": wake_results, "asr_results": asr_results},
                         )
@@ -1548,6 +1551,7 @@ class BurnScenario:
                 "wake_result_count": len(wake_results),
                 "asr_result_count": len(asr_results),
                 "multi_result": multi_result,
+                "anomaly_codes": [multi_code] if multi_code else [],
                 "input_text": self.fw_key,
                 "firmware": {
                     "kind": self.fw_key,
