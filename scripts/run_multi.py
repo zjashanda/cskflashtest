@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import csv
 import json
 import os
@@ -237,6 +238,58 @@ def main() -> int:
 
     pending = deque(devices)
     running: list[dict] = []
+    completed_normally = False
+    partial_summary_written = False
+
+    def write_partial_summary() -> None:
+        nonlocal partial_summary_written
+        if completed_normally or partial_summary_written:
+            return
+        partial_summary_written = True
+        active = list(running)
+        if not active:
+            return
+        fieldnames = [
+            "device_id", "label", "control", "csk", "burn", "hisi", "rounds", "completed",
+            "returncode", "status", "result_dir", "started_at", "ended_at", "duration_s",
+        ]
+        try:
+            with summary_path.open("a", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                for item in active:
+                    device = item["device"]
+                    rdir = result_dir_for(
+                        result_root, str(device.get("label") or device["id"]),
+                        args.rounds, item["before"], prefix=scenario,
+                        run_name=item.get("run_name"),
+                    )
+                    completed = summary_for(rdir)["rounds"] if rdir is not None else 0
+                    writer.writerow({
+                        "device_id": device["id"],
+                        "label": device.get("label", ""),
+                        "control": device["control"],
+                        "csk": device["csk"],
+                        "burn": device["burn"],
+                        "hisi": device.get("hisi", ""),
+                        "rounds": args.rounds,
+                        "completed": completed,
+                        "returncode": -1,
+                        "status": "FAIL",
+                        "result_dir": str(rdir or ""),
+                        "started_at": time.strftime(
+                            "%Y-%m-%d %H:%M:%S",
+                            time.localtime(item["started"] + time.time() - time.monotonic()),
+                        ),
+                        "ended_at": now_human(),
+                        "duration_s": round(time.monotonic() - item["started"], 1),
+                    })
+                handle.flush()
+            print(f"[{now_human()}] PARTIAL_SUMMARY written for {len(active)} running devices", flush=True)
+        except Exception:
+            pass
+
+    atexit.register(write_partial_summary)
+
     job = KillOnCloseJob()
     job.create()
     register_process_cleanup(lambda: [item.get("process") for item in running])
@@ -422,6 +475,7 @@ def main() -> int:
 
             time.sleep(0.2)
 
+    completed_normally = True
     progress_handle.close()
     print(f"[{now_human()}] summary: {summary_path}", flush=True)
     for row in rows:

@@ -40,6 +40,7 @@ from lstest.scripts.interaction_acceptance import (  # noqa: E402
     mode_label,
     rejects_multi_result,
 )
+from lstest.scripts.environment_cleanup import kill_process_tree  # noqa: E402
 from lstest.scripts.runtime import ScenarioRuntime  # noqa: E402
 from lstest.scripts.serial_recovery import recover_serial  # noqa: E402
 from lstest.scripts.timeline import ToolLogValidator  # noqa: E402
@@ -632,6 +633,26 @@ class BurnScenario:
         finally:
             shutil.rmtree(acquired, ignore_errors=True)
 
+    def _finish_playback(self, proc: subprocess.Popen, timeout_s: float = 5.0) -> str:
+        """Drain playback output with a timeout and terminate the entire child tree."""
+        try:
+            output, _ = proc.communicate(timeout=max(0.1, timeout_s))
+            return output.decode("gbk", "replace") if output else ""
+        except subprocess.TimeoutExpired:
+            kill_process_tree(proc.pid)
+            try:
+                output, _ = proc.communicate(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                try:
+                    output, _ = proc.communicate(timeout=2.0)
+                except Exception:
+                    output = b""
+            return (output or b"").decode("gbk", "replace")
+
     def wake_once(self) -> tuple[bool, bool, str, list[str], dict]:
         """Play the wake word once and report whether the device woke."""
         wake_patterns = [re.compile(str(item), re.I) for item in self.wake.get("wake_patterns", []) if str(item)]
@@ -650,11 +671,7 @@ class BurnScenario:
             lambda text: any(pattern.search(text) for pattern in wake_patterns) or "bootloader application" in text,
             float(self.wake.get("playback_timeout_s", 12.0)),
         )
-        try:
-            proc.wait(timeout=5.0)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        play_output = proc.stdout.read().decode("gbk", "replace") if proc.stdout is not None else ""
+        play_output = self._finish_playback(proc, 5.0)
         time.sleep(0.3)
         csk_events = self.csk.events_since(wake_cursor)
         control_events = self.control.events_since(control_cursor)
@@ -735,11 +752,7 @@ class BurnScenario:
             )
             predicate = lambda text: any(pattern.search(text) for pattern in wake_patterns) or "bootloader application" in text
             self.csk.wait_for(play_cursor, predicate, playback_timeout)
-            try:
-                proc.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-            play_output = proc.stdout.read().decode("gbk", "replace") if proc.stdout is not None else ""
+            play_output = self._finish_playback(proc, 5.0)
             time.sleep(0.5)
             csk_events = self.csk.events_since(play_cursor)
             control_events = self.control.events_since(control_cursor)
@@ -881,11 +894,7 @@ class BurnScenario:
             )
             predicate = lambda text: response_after_keyword(text) or "bootloader application" in text
             self.csk.wait_for(play_cursor, predicate, timeout_s)
-            try:
-                proc.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-            play_output = proc.stdout.read().decode("gbk", "replace") if proc.stdout is not None else ""
+            play_output = self._finish_playback(proc, 5.0)
             time.sleep(0.5)
             csk_events = self.csk.events_since(play_cursor)
             control_events = self.control.events_since(control_cursor)

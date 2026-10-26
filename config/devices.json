@@ -1,5 +1,5 @@
 {
-  "_note": "按用户最新 5 块 ListenAI 板卡清单映射：control=VCOM，csk=CH344 A，burn=CH344 B，hisi=CH344 C，CH344 D 暂不使用；render_device_key 取对应板卡扬声器端点。USB 板卡仅有 COM1，无独立声卡，暂不启用。",
+  "_note": "当前 5 台 ListenAI 板卡映射：control=VCOM，csk=CH344 A，burn=CH344 B，hisi=CH344 C，CH344 D 暂不使用。板卡 #3 当前未枚举到音频端点，先禁用音频压测。USB 板卡使用 COM1，暂无动作，禁用。",
   "devices": [
     {
       "id": "dev01",
@@ -14,21 +14,21 @@
     {
       "id": "dev02",
       "label": "2",
-      "control": "COM35",
-      "csk": "COM37",
-      "burn": "COM33",
-      "hisi": "COM36",
-      "render_device_key": "VID_8765&PID_5678:7_224B2F24_0_0000",
+      "control": "COM19",
+      "csk": "COM18",
+      "burn": "COM20",
+      "hisi": "COM21",
+      "render_device_key": "VID_8765&PID_5678:7_14D4F031_0_0000",
       "enabled": true
     },
     {
       "id": "dev03",
       "label": "3",
-      "control": "COM39",
-      "csk": "COM38",
-      "burn": "COM40",
-      "hisi": "COM41",
-      "render_device_key": "VID_8765&PID_5678:7_2825057A_0_0000",
+      "control": "COM32",
+      "csk": "COM30",
+      "burn": "COM28",
+      "hisi": "COM29",
+      "render_device_key": "VID_8765&PID_5678:7_319BF789_0_0000",
       "enabled": true
     },
     {
