@@ -16,7 +16,9 @@ import re
 import subprocess
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
+from itertools import islice
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -42,14 +44,53 @@ class LineEvent:
     text: str
     log_name: str = ""
     phase: str = ""
+    kind: str = ""
 
     @property
     def evidence(self) -> str:
         return f"serial_logs/{self.log_name}#{self.cursor}"
 
 
+class FactStore:
+    """有界事实缓存；完整原始日志保留在 serial_logs。"""
+
+    def __init__(self, maxlen: int = 20000) -> None:
+        self._facts: deque[LineEvent] = deque(maxlen=maxlen)
+        self._base = 0
+        self._condition = threading.Condition()
+
+    def append(self, fact: LineEvent) -> None:
+        with self._condition:
+            if self._facts.maxlen is not None and len(self._facts) >= self._facts.maxlen:
+                self._base += 1
+            self._facts.append(fact)
+            self._condition.notify_all()
+
+    def since(self, cursor: int) -> list[LineEvent]:
+        with self._condition:
+            start = max(0, int(cursor) - self._base)
+            return list(islice(self._facts, start, None))
+
+    def wait_for(
+        self,
+        cursor: int,
+        predicate: Callable[[str], bool],
+        timeout_s: float,
+        stop_event: threading.Event,
+    ) -> tuple[list[LineEvent], bool]:
+        deadline = time.monotonic() + max(0.0, timeout_s)
+        while True:
+            events = self.since(cursor)
+            if predicate("\n".join(item.text for item in events)):
+                return events, True
+            if stop_event.is_set() or time.monotonic() >= deadline:
+                return events, False
+            with self._condition:
+                self._condition.wait(min(0.05, max(0.0, deadline - time.monotonic())))
+
+
 class SerialCollector:
-    """连续读取一个串口，保留原始行并支持按游标取证据。"""
+    """连续读取一个串口，原始行追加到文件，解析器写入有界事实缓存。"""
 
     def __init__(
         self,
@@ -76,16 +117,18 @@ class SerialCollector:
         self._lock = threading.RLock()
         self._write_lock = threading.Lock()
         self._stop = threading.Event()
-        self._events: list[LineEvent] = []
+        self._facts = FactStore()
         self._cursor = 0
         self._handle: serial.Serial | None = None
         self._thread: threading.Thread | None = None
+        self._parser_thread: threading.Thread | None = None
         self._log = None
         self.error = ""
         self.reconnects = 0
 
     def start(self) -> None:
         self._log = self.log_path.open("a", encoding="utf-8", newline="\n")
+        self._start_parser(start_at_end=True)
         self._open()
         self._thread = threading.Thread(target=self._run, name=f"collector-{self.port}", daemon=True)
         self._thread.start()
@@ -93,6 +136,7 @@ class SerialCollector:
     def open_log_only(self) -> None:
         """仅打开证据文件，用于接收烧录工具 stdout 等非串口来源。"""
         self._log = self.log_path.open("a", encoding="utf-8", newline="\n")
+        self._start_parser(start_at_end=False)
 
     def _open(self) -> None:
         self._handle = serial.Serial(self.port, self.baudrate, timeout=0.2)
@@ -138,35 +182,104 @@ class SerialCollector:
                 continue
             attempts = 0
             text = raw.decode("utf-8", "replace").rstrip("\r\n")
-            self._ingest(text)
+            self._write_line(text)
 
-    def _ingest(self, text: str, *, timestamp: str | None = None) -> LineEvent | None:
+    def _write_line(self, text: str, *, timestamp: str | None = None) -> None:
         with self._lock:
             self._cursor += 1
-            event = LineEvent(
-                port=self.port,
-                role=self.role,
-                source=self.source,
-                cursor=self._cursor,
-                timestamp=timestamp or now_human(),
-                monotonic=time.monotonic(),
-                text=text,
-                log_name=self.log_name,
-            )
-            self._events.append(event)
+            event_time = timestamp or now_human()
             if self._log is not None:
-                self._log.write(f"[{event.timestamp}] {self.port} {self.role} #{event.cursor} {text}\n")
+                self._log.write(f"[{event_time}] {self.port} {self.role} #{self._cursor} {text}\n")
                 self._log.flush()
+
+    def inject(self, text: str) -> None:
+        """把非串口来源（烧录工具 stdout）按同一证据格式写入。"""
+        self._write_line(text)
+
+    def _start_parser(self, *, start_at_end: bool) -> None:
+        if self._parser_thread is not None and self._parser_thread.is_alive():
+            return
+        self._parser_thread = threading.Thread(
+            target=self._parser_loop,
+            args=(start_at_end,),
+            name=f"parser-{self.port}",
+            daemon=True,
+        )
+        self._parser_thread.start()
+
+    def _parser_loop(self, start_at_end: bool) -> None:
+        try:
+            with self.log_path.open("rb") as handle:
+                if start_at_end:
+                    handle.seek(0, 2)
+                buffer = b""
+                while not self._stop.is_set():
+                    chunk = handle.read(4096)
+                    if not chunk:
+                        time.sleep(0.05)
+                        continue
+                    buffer += chunk
+                    while b"\n" in buffer:
+                        raw, buffer = buffer.split(b"\n", 1)
+                        self._parse_line(raw.decode("utf-8", "replace").rstrip("\r"))
+        except Exception as error:
+            self.error = f"{type(error).__name__}: {error}"
+            if self.on_error:
+                try:
+                    self.on_error("SERIAL_PARSE_ERROR", f"{self.port} 日志解析失败: {error}")
+                except Exception:
+                    pass
+
+    def _parse_line(self, line: str) -> None:
+        match = re.match(r"^\[([^\]]+)\] (\S+) (\S+) #(\d+) (.*)$", line)
+        if not match:
+            return
+        timestamp, port, role, cursor_text, text = match.groups()
+        fact = LineEvent(
+            port=port,
+            role=role,
+            source=self.source,
+            cursor=int(cursor_text),
+            timestamp=timestamp,
+            monotonic=time.monotonic(),
+            text=text,
+            log_name=self.log_name,
+            kind=self._classify(text),
+        )
+        self._facts.append(fact)
         if self.on_event:
             try:
-                self.on_event(event)
+                self.on_event(fact)
             except Exception:
                 pass
-        return event
 
-    def inject(self, text: str) -> LineEvent | None:
-        """把非串口来源（烧录工具 stdout）按同一证据格式写入。"""
-        return self._ingest(text)
+    @staticmethod
+    def _classify(text: str) -> str:
+        if "root:/$" in text:
+            return "CONTROL_PROMPT"
+        if "spk.uas@start" in text:
+            return "PLAYBACK_START"
+        if "spk.uas@stop" in text:
+            return "PLAYBACK_STOP"
+        if "PA Enable" in text or "pa-enable." in text:
+            return "PA_ENABLE"
+        if "bootloader application" in text:
+            return "BOOTLOADER"
+        if "AP Boot Ready" in text:
+            return "BOOT_READY"
+        if "keyword:" in text:
+            return "ASR_KEYWORD"
+        if "vir_kid" in text:
+            return "ASR_KID"
+        if "start local wakeup" in text or "wakeup data:" in text:
+            return "WAKE"
+        if "flash set log_lev" in text:
+            return "LOG_LEVEL"
+        if "Boot Reason:" in text:
+            return "BOOT_REASON"
+        if re.search(r"FATAL|ASSERT FAIL|HardFault|panic|watchdog reset|Stack overflow", text, re.I):
+            return "FATAL"
+        return "SERIAL_LINE"
 
     def write(self, text: str) -> None:
         with self._write_lock:
@@ -181,9 +294,12 @@ class SerialCollector:
         self._close_handle()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
+        if self._parser_thread is not None:
+            self._parser_thread.join(timeout=2.0)
         self._stop.clear()
         self.error = ""
         self._open()
+        self._start_parser(start_at_end=True)
         self._thread = threading.Thread(target=self._run, name=f"collector-{self.port}", daemon=True)
         self._thread.start()
 
@@ -192,8 +308,7 @@ class SerialCollector:
             return self._cursor
 
     def events_since(self, cursor: int) -> list[LineEvent]:
-        with self._lock:
-            return list(self._events[cursor:])
+        return self._facts.since(cursor)
 
     def text_since(self, cursor: int) -> str:
         return "\n".join(item.text for item in self.events_since(cursor))
@@ -204,14 +319,7 @@ class SerialCollector:
         predicate: Callable[[str], bool],
         timeout_s: float,
     ) -> tuple[list[LineEvent], bool]:
-        deadline = time.monotonic() + max(0.0, timeout_s)
-        while True:
-            events = self.events_since(cursor)
-            if predicate("\n".join(item.text for item in events)):
-                return events, True
-            if time.monotonic() >= deadline or self._stop.is_set():
-                return events, False
-            time.sleep(0.05)
+        return self._facts.wait_for(cursor, predicate, timeout_s, self._stop)
 
     def _close_handle(self) -> None:
         if self._handle is not None:
@@ -226,6 +334,8 @@ class SerialCollector:
         self._close_handle()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
+        if self._parser_thread is not None:
+            self._parser_thread.join(timeout=2.0)
         if self._log is not None:
             try:
                 self._log.close()
