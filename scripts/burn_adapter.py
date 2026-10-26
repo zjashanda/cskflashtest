@@ -51,6 +51,9 @@ class LineEvent:
         return f"serial_logs/{self.log_name}#{self.cursor}"
 
 
+MAX_PARSER_BUFFER = 4 * 1024 * 1024
+
+
 class FactStore:
     """有界事实缓存；完整原始日志保留在 serial_logs。"""
 
@@ -123,6 +126,7 @@ class SerialCollector:
         self._thread: threading.Thread | None = None
         self._parser_thread: threading.Thread | None = None
         self._log = None
+        self._parser_overflow_reported = False
         self.error = ""
         self.reconnects = 0
 
@@ -222,6 +226,16 @@ class SerialCollector:
                     while b"\n" in buffer:
                         raw, buffer = buffer.split(b"\n", 1)
                         self._parse_line(raw.decode("utf-8", "replace").rstrip("\r"))
+                    if len(buffer) > MAX_PARSER_BUFFER:
+                        if not self._parser_overflow_reported:
+                            self._parser_overflow_reported = True
+                            self.error = f"{self.port} parser line buffer exceeded {MAX_PARSER_BUFFER} bytes"
+                            if self.on_error:
+                                try:
+                                    self.on_error("SERIAL_LINE_OVERSIZED", self.error)
+                                except Exception:
+                                    pass
+                        buffer = b""
         except Exception as error:
             self.error = f"{type(error).__name__}: {error}"
             if self.on_error:

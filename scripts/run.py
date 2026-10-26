@@ -1743,8 +1743,7 @@ class BurnScenario:
         if self.artifacts is None:
             return
         try:
-            text = self.artifacts.tool_log_path.read_text(encoding="utf-8")
-            errors = ToolLogValidator().validate_text(text)
+            errors = ToolLogValidator().validate_path(self.artifacts.tool_log_path)
         except Exception as exc:
             print(f"tool.log validation failed: {exc}", flush=True)
             return

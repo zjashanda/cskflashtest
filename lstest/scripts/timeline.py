@@ -161,6 +161,7 @@ class TimelineLedger:
         self._write = write
         self._now = now
         self._cases: dict[str, CaseTimeline] = {}
+        self._closed_cases: set[str] = set()
         self._player = PlayerWindowReducer()
         self._task_anomalies: Counter[str] = Counter()
 
@@ -439,6 +440,8 @@ class TimelineLedger:
         expected_keys: Iterable[str] = (),
         current_anomaly_counts: Mapping[str, int] | None = None,
     ) -> dict[str, Any]:
+        if case_id in self._closed_cases:
+            return {"status": status, "reason": reason}
         timeline = self._cases.get(case_id)
         if timeline is None:
             timeline = CaseTimeline(case_id, 0, "", "", 1, 0)
@@ -505,6 +508,8 @@ class TimelineLedger:
         }
         timeline.facts.clear()
         timeline.anomalies.clear()
+        self._cases.pop(case_id, None)
+        self._closed_cases.add(case_id)
         return result
 
     def task_summary(self, *, planned: int, completed: int, counts: Mapping[str, int], reason: str, status: str) -> None:
@@ -525,11 +530,12 @@ class ToolLogValidator:
 
     LINE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[([A-Z]+)(?: \d+/(?:\d+|-))?\] .+$")
 
-    def validate_text(self, text: str) -> list[str]:
+    def validate_lines(self, lines) -> list[str]:
         errors: list[str] = []
         active_case = False
         result_seen = False
-        for number, line in enumerate(text.splitlines(), start=1):
+        for number, raw_line in enumerate(lines, start=1):
+            line = str(raw_line).rstrip("\r\n")
             if not line:
                 continue
             match = self.LINE.match(line)
@@ -559,6 +565,13 @@ class ToolLogValidator:
             errors.append("最后一个用例缺少本轮结果")
         return errors
 
+    def validate_text(self, text: str) -> list[str]:
+        return self.validate_lines(text.splitlines())
+
+    def validate_path(self, path: Path) -> list[str]:
+        with Path(path).open("r", encoding="utf-8", errors="replace") as handle:
+            return self.validate_lines(handle)
+
     def validate_run(self, run_dir: Path) -> list[str]:
         """Validate the delivery boundary and human ledger of one finished run."""
         root = Path(run_dir)
@@ -579,5 +592,5 @@ class ToolLogValidator:
                     errors.append(f"串口证据不是 .log: {item.name}")
         tool = root / "tool.log"
         if tool.is_file():
-            errors.extend(self.validate_text(tool.read_text(encoding="utf-8")))
+            errors.extend(self.validate_path(tool))
         return errors

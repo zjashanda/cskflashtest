@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
+from itertools import islice
 from pathlib import Path
 from typing import Callable, Any, Iterable
 
@@ -17,6 +19,9 @@ try:
     from .core import PortSpec, TaskArtifacts, now_iso
 except ImportError:  # direct execution fallback
     from core import PortSpec, TaskArtifacts, now_iso
+
+
+MAX_EVENTS_PER_PORT = 20000
 
 
 @dataclass(frozen=True)
@@ -40,7 +45,8 @@ class SerialManager:
         self.errors: dict[str, str] = {}
         self.cursors: dict[str, int] = {}
         self.reconnect_attempts: dict[str, int] = {}
-        self.events: dict[str, list[SerialEvent]] = {}
+        self.events: dict[str, deque[SerialEvent]] = {}
+        self.event_base: dict[str, int] = {}
         self._events_lock = threading.RLock()
         self.open_failures: dict[str, str] = {}
 
@@ -66,7 +72,8 @@ class SerialManager:
                 continue
             self.handles[spec.port] = handle
             self.cursors[spec.port] = 0
-            self.events[spec.port] = []
+            self.events[spec.port] = deque(maxlen=MAX_EVENTS_PER_PORT)
+            self.event_base[spec.port] = 0
             role = spec.role or "unknown"
             self.artifacts.emit("SERIAL_OPEN", message=f"串口 {spec.port} 已打开。", task_log=True, port=spec.port, role=role, baudrate=spec.baudrate)
             thread = threading.Thread(target=self._reader, args=(spec,), name=f"lstest-{spec.port}", daemon=True)
@@ -99,7 +106,10 @@ class SerialManager:
                     timestamp = now_iso()
                     event = SerialEvent(spec.port, role, self.cursors[spec.port], timestamp, time.monotonic(), text)
                     with self._events_lock:
-                        self.events[spec.port].append(event)
+                        events = self.events[spec.port]
+                        if events.maxlen is not None and len(events) >= events.maxlen:
+                            self.event_base[spec.port] = self.event_base.get(spec.port, 0) + 1
+                        events.append(event)
                     # Each captured event occupies exactly one physical line;
                     # cursor therefore maps directly to the human log line.
                     log.write(f"[{timestamp}] {spec.port} {role} #{self.cursors[spec.port]} {text}\n")
@@ -134,7 +144,10 @@ class SerialManager:
     def snapshot(self, port: str | None = None) -> dict[str, int]:
         with self._events_lock:
             ports: Iterable[str] = (port,) if port else self.events.keys()
-            return {name: len(self.events.get(name, ())) for name in ports}
+            return {
+                name: self.event_base.get(name, 0) + len(self.events.get(name, ()))
+                for name in ports
+            }
 
     def since(self, cursors: dict[str, int], *, ports: Iterable[str] | None = None) -> list[SerialEvent]:
         with self._events_lock:
@@ -145,7 +158,9 @@ class SerialManager:
             for port, values in self.events.items():
                 if selected and port not in selected:
                     continue
-                result.extend(values[int(cursors.get(port, 0)):])
+                base = self.event_base.get(port, 0)
+                start = max(0, int(cursors.get(port, 0)) - base)
+                result.extend(islice(values, start, None))
         return sorted(result, key=lambda item: item.monotonic_seconds)
 
     def wait_for(self, predicate: Callable[[list[SerialEvent]], bool], timeout_s: float, *, cursors: dict[str, int] | None = None) -> list[SerialEvent]:

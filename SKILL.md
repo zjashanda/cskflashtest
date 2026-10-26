@@ -125,6 +125,16 @@ verify_burn.bat 1 strict
 
 任务结束输出 `[OUTCOME]` 表格，并写入 `summary_outcomes.csv`（按设备统计轮数、成功、失败、四态、多结果和平均单轮耗时）。
 
+## 长跑稳定性约束
+
+- `SerialCollector` 使用 append-only `serial_logs` + tailing parser + 有界 `FactStore`（每端口 2 万条），不再保留全量串口事件。
+- parser 单行缓冲上限 4MiB；超限丢弃当前缓冲并记录 `SERIAL_LINE_OVERSIZED`，防止无换行日志无限增长。
+- `TimelineLedger`、`ScenarioRuntime`、`TaskArtifacts` 在每个 case 结束后释放 case facts、anomalies、window、metadata 和 position。
+- 最终 `results.csv` 对账和 `tool.log` 校验使用流式读取，禁止 `read_text()` 或全量 row list。
+- `StopSupervisor` 在磁盘低于阈值时请求 `DISK_STOP_LINE`；1000 小时运行仍需预留约 80–100GB 日志/结果空间（4 台估算）。
+- 上述约束只覆盖代码层；USB、串口驱动、声卡、电源和设备固件属于外部风险。`test_start` 约 6 小时运行上限也属于外部启动工具限制。
+- 长跑回归：`python -m unittest tests.test_serial_fact_store tests.test_long_run_soak -v`。
+
 ## 两套压测入口
 
 ### 1. 烧录 + 唤醒/ASR
