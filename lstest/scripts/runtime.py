@@ -1392,6 +1392,12 @@ class ScenarioRuntime:
             self.close_case_window(row.case_id)
             generated = self._case_facts.pop(row.case_id, {})
             self._attempts.pop(row.case_id, None)
+            self.case_windows.pop(row.case_id, None)
+            for key in [item for item in self._profile_player_started if item[1] == row.case_id]:
+                self._profile_player_started.pop(key, None)
+            for key, value in list(self._online_requests.items()):
+                if value.get("case_id") == row.case_id:
+                    self._online_requests.pop(key, None)
             row.facts = {**generated, **row.facts}
             self.artifacts.record_case(row)
             return

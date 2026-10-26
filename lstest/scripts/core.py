@@ -1356,6 +1356,8 @@ class TaskArtifacts:
             self._writer.writerow({name: self._csv_value(value) for name, value in row.items()})
             self._csv.flush()
         self._record_round_exception_summary(result.case_id, status)
+        self._case_metadata.pop(result.case_id, None)
+        self._case_positions.pop(result.case_id, None)
 
     def _record_round_exception_summary(self, case_id: str, status: str) -> None:
         """Print and persist the cumulative, task-level exception snapshot."""

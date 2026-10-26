@@ -495,7 +495,7 @@ class TimelineLedger:
             summary = self._append(summary, timeline.reason_labels.get(code, code), count)
         self._line("SUMMARY", summary)
         self._write("\n")
-        return {
+        result = {
             "status": final_status,
             "reason": final_reason,
             "raw_counts": raw_counts,
@@ -503,6 +503,9 @@ class TimelineLedger:
             "missing": missing,
             "anomaly_codes": anomaly_codes,
         }
+        timeline.facts.clear()
+        timeline.anomalies.clear()
+        return result
 
     def task_summary(self, *, planned: int, completed: int, counts: Mapping[str, int], reason: str, status: str) -> None:
         body = f"任务完成: 计划={planned}，完成={completed}"
