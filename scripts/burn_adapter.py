@@ -143,7 +143,7 @@ class SerialCollector:
         self._start_parser(start_at_end=False)
 
     def _open(self) -> None:
-        self._handle = serial.Serial(self.port, self.baudrate, timeout=0.2)
+        self._handle = serial.Serial(self.port, self.baudrate, timeout=0.2, write_timeout=0.5)
         try:
             self._handle.reset_input_buffer()
         except Exception:

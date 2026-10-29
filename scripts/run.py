@@ -366,7 +366,7 @@ class BurnScenario:
     def control_prompt_ok(self) -> None:
         import serial
 
-        handle = serial.Serial(self.control_port, self.control_baud, timeout=0.2)
+        handle = serial.Serial(self.control_port, self.control_baud, timeout=0.2, write_timeout=0.5)
         try:
             time.sleep(0.2)
             handle.reset_input_buffer()
