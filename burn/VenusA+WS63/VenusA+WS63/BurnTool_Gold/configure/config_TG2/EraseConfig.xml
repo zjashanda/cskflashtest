@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<EraseConfig>
+    <STRUCT NAME="Config">
+        <DATA ID="1" NAME="fac"/>
+        <DATA ID="2" NAME="cfga"/>
+        <DATA ID="4" NAME="cfgb"/>
+		<DATA ID="8" NAME="log"/>
+		<DATA ID="16" NAME="pstore"/>
+		<DATA ID="32" NAME="fwka"/>
+		<DATA ID="64" NAME="fwkb"/>
+		<DATA ID="128" NAME="app"/>
+    </STRUCT>
+</EraseConfig>

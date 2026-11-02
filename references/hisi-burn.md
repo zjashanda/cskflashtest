@@ -13,13 +13,15 @@
 
 `VenusA_Burn/Uart_Burn_Tool.exe` 只能用于 CSK/VenusA，不能用于 HISI。
 
-工具包是厂商 GUI/命令行包，不随本仓库的 CSK 运行时一起提交；在目标机器上把 `VenusA+WS63` 目录放到：
+工具包是厂商 GUI/命令行包，已纳入仓库：
 
 ```text
 burn/VenusA+WS63/VenusA+WS63/
 ```
 
-`auto_burn.py` 会从这里读取 `BurnTool_Gold/BurnTool.exe`。
+运行时日志 `BurnTool_Gold/optLog/`、`BurnTool_Gold/tmp/`、`BurnTool_Gold/log.txt` 和旧的临时 fwpkg 不入库，避免把历史运行数据混进仓库。
+
+`auto_burn.py` 会从这里读取 `BurnTool_Gold/BurnTool.exe`。如果目标机器没有该目录，直接从仓库拉取 `burn/VenusA+WS63` 即可。
 
 ## 2. 固件校验
 
