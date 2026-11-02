@@ -691,7 +691,7 @@ class BurnScenario:
             "play_output": play_output[-300:],
         }
 
-    def run_wake_test(self) -> tuple[bool, bool, str, list[str], dict]:
+    def run_wake_test(self, repeat: int = 1) -> tuple[bool, bool, str, list[str], dict]:
         """切换英文后用指定 Render 声卡播报唤醒词，并校验控制口播放标记和 CSK 唤醒标记。"""
         if not self.wake:
             return False, False, "manifest 缺少 wake 配置", [], {}
@@ -701,8 +701,10 @@ class BurnScenario:
         start_pattern = str(self.wake.get("playback_start_pattern", "spk.uas@start!!"))
         stop_pattern = str(self.wake.get("playback_stop_pattern", "spk.uas@stop!!"))
         playback_timeout = float(self.wake.get("playback_timeout_s", 12.0))
+        repeat = max(1, int(repeat))
         attempts = max(1, int(self.wake.get("attempts", 5)))
-        details: dict = {"language": {}, "attempts": []}
+        attempts = max(attempts, repeat)
+        details: dict = {"language": {}, "attempts": [], "repeat": repeat}
         evidence: list[str] = []
 
         language_ok = True
@@ -736,6 +738,7 @@ class BurnScenario:
 
         playback_ok = False
         wake_ok = False
+        success_count = 0
         last_reason = ""
         for attempt in range(1, attempts + 1):
             play_cursor = self.csk.snapshot()
@@ -799,12 +802,15 @@ class BurnScenario:
             playback_ok = playback_observed and not reset
             wake_ok = has_wake and not reset
             if playback_ok and wake_ok:
-                last_reason = f"第 {attempt} 次播报唤醒成功"
-                break
-            last_reason = (
-                f"第 {attempt} 次失败: playback={has_start}, playback_csk={has_miniplayer}, "
-                f"stop={has_stop}, wake={has_wake}, reset={reset}"
-            )
+                success_count += 1
+                last_reason = f"wake {success_count}/{repeat} OK"
+                if repeat <= 1:
+                    break
+            else:
+                last_reason = (
+                    f"attempt {attempt} failed: playback={has_start}, playback_csk={has_miniplayer}, "
+                    f"stop={has_stop}, wake={has_wake}, reset={reset}"
+                )
             if attempt < attempts:
                 if not self._pa_enabled:
                     self.ensure_audio_enabled()
@@ -819,7 +825,12 @@ class BurnScenario:
         )
         details["failed_attempts"] = failed_attempts
         details["max_attempts"] = attempts
-        details["success"] = bool(playback_ok and wake_ok and language_ok)
+        details["required_successes"] = repeat
+        details["success_count"] = success_count
+        all_repeats_ok = success_count >= repeat
+        playback_ok = bool(all_repeats_ok)
+        wake_ok = bool(all_repeats_ok)
+        details["success"] = bool(all_repeats_ok and language_ok)
         successful = next(
             (item for item in reversed(details["attempts"]) if item.get("wake") and not item.get("reset")),
             {},
@@ -1362,7 +1373,9 @@ class BurnScenario:
 
             with self.audio_slot():
                 if self.args.wake_test:
-                    playback_ok, wake_ok, wake_reason, wake_evidence, wake_details = self.run_wake_test()
+                    playback_ok, wake_ok, wake_reason, wake_evidence, wake_details = self.run_wake_test(
+                        repeat=max(1, int(getattr(self.args, "wake_repeat", 1)))
+                    )
                     language_ok = bool(wake_details.get("language", {}).get("ok", True))
                     add_check("wake_language", language_ok,
                               "英文切换未确认" if not language_ok else "英文模式已确认",
@@ -1771,6 +1784,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--preflight", action="store_true", help="只做预检，不执行设备动作")
     parser.add_argument("--skip-burn", action="store_true", help="跳过烧录，只验证控制时序和启动日志")
     parser.add_argument("--wake-test", action="store_true", help="初始化后切换英文、播报唤醒词并校验唤醒")
+    parser.add_argument("--wake-repeat", type=int, default=1, help="single power-on consecutive wake count" )
     parser.add_argument("--interaction-test", action="store_true", help="唤醒后播报命令词并校验 ASR 与响应")
     parser.add_argument("--acceptance", choices=sorted(MODES), default="",
                         help="单轮交互验收模式：strict/any_asr/asr_optional/wake_only")
@@ -1798,6 +1812,10 @@ def main() -> int:
         raise SystemExit("--rounds must be > 0")
     if args.interaction_test:
         args.wake_test = True
+    if args.wake_repeat > 1:
+        args.wake_test = True
+    if args.wake_repeat <= 0:
+        raise SystemExit("--wake-repeat must be > 0")
     return BurnScenario(args).run()
 
 

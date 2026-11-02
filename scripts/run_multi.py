@@ -174,6 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fw", default="", help="全局固件类型；留空则使用 auto/设备配置")
     parser.add_argument("--no-hisi", action="store_true")
     parser.add_argument("--wake-test", action="store_true", help="每轮初始化后切换英文并验证唤醒")
+    parser.add_argument("--wake-repeat", type=int, default=1, help="single power-on consecutive wake count")
     parser.add_argument("--interaction-test", action="store_true", help="唤醒后播报命令词并校验 ASR/响应")
     parser.add_argument("--acceptance", choices=sorted(MODES), default="",
                         help="单轮交互验收模式：strict/any_asr/asr_optional/wake_only")
@@ -328,8 +329,12 @@ def main() -> int:
                     cmd += ["--fw", args.fw]
                 if args.no_hisi:
                     cmd += ["--no-hisi"]
+                if args.wake_repeat > 1:
+                    args.wake_test = True
                 if args.wake_test or args.interaction_test:
                     cmd += ["--wake-test"]
+                if args.wake_repeat > 1:
+                    cmd += ["--wake-repeat", str(args.wake_repeat)]
                 if args.interaction_test:
                     cmd += ["--interaction-test"]
                 if args.acceptance:

@@ -33,6 +33,7 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 - `burn/Uart_Burn_Tool.exe`：CSK 烧录工具；
 - `fw/V46.1.8_20261102093954/CSK/fw.img`：整镜像固件；
 - `fw/V46.1.8_20261102093954/CSK/fw.hex`：hex 固件；
+- `fw/V46.1.8_20261102093954/HISI/ws63-liteos-app_all.fwpkg`：HISI/WS63 烧录包；
 - `wav/Wake/hellohaier.wav`：唤醒词；
 - `wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav`：交互命令词“打开空调”（Turn on aircon）；
 - `wav/` 下的完整意图语料，供命令词扫描使用。
@@ -210,6 +211,34 @@ preflight_powercycle.bat
 ```
 
 `-t 10` 只表示建链超时，不是总烧录超时；总超时由 `timing.burn_timeout_s`（默认 600s）控制，超时会终止工具，随后仍执行退出 boot 和重新上电。
+
+## HISI / WS63 烧录
+
+HISI 与 CSK 使用独立工具、固件包和串口参数，完整流程见 [references/hisi-burn.md](references/hisi-burn.md)。
+
+| 项目 | CSK | HISI / WS63 |
+|---|---|---|
+| 工具 | `burn/Uart_Burn_Tool.exe` | `burn/VenusA+WS63/VenusA+WS63/BurnTool_Gold/BurnTool.exe` |
+| 固件 | `fw/.../CSK/fw.hex` / `fw.img` | `fw/.../HISI/ws63-liteos-app_all.fwpkg` |
+| 烧录协议波特率 | `1500000` | `1000000`（`-signalbaud`） |
+| 应用日志/AT 波特率 | `115200` | `1500000` |
+| 结果日志 | Uart_Burn_Tool 输出 + CSK 日志 | `BurnTool_Gold/optLog/optLog_*.txt` + HISI/CSK 日志 |
+
+单台示例：
+
+```powershell
+cd D:\workstation\quattro\102200cskflashst\burn\VenusA+WS63\VenusA+WS63
+
+python -u auto_burn.py `
+  --firmware-root "D:\workstation\quattro\102200cskflashst\fw\V46.1.8_20261102093954\HISI" `
+  --control-port COM16 `
+  --ws63-port COM14 `
+  --skip-venusa `
+  --ws63-at-baud 1500000 `
+  --ws63-burn-kick-delay-ms 1500
+```
+
+成功判定：`optLog` 出现 `烧写结果：成功`，且 `AT+FTM=0` 返回 `+FTM SWITCH: start ... OK`。`HISI/out/update.fwpkg` 是 OTA 包，不能用于 BurnTool。
 
 ## 初始化后设置 log level
 
@@ -408,7 +437,7 @@ python cskflashtest/scripts/commission.py --key hex --update --tool-md5 0x...
 
 ## 非目标
 
-- 本 Skill 不负责 HISI 固件烧录；
+- CSK 主流程不包含 HISI 烧录；HISI/WS63 使用独立工具，步骤见 [references/hisi-burn.md](references/hisi-burn.md)；
 - 不把烧录工具输出写进 `tool.log`；
 - 不修改 `lstest` 目录；
 - 不在预检失败时猜测日志含义或继续上电烧录。

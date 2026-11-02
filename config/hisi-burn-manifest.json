@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "chip": "WS63",
+  "firmware": {
+    "package": "fw/V46.1.8_20261102093954/HISI/ws63-liteos-app_all.fwpkg",
+    "md5": "4a94be733de61e45df4bfe6d0b44a9f3",
+    "size": 3658512,
+    "not_for_burn_tool": [
+      "fw/V46.1.8_20261102093954/HISI/out/update.fwpkg"
+    ]
+  },
+  "tool": {
+    "executable": "burn/VenusA+WS63/VenusA+WS63/BurnTool_Gold/BurnTool.exe",
+    "driver": "burn/VenusA+WS63/VenusA+WS63/auto_burn.py",
+    "signal_baud": 1000000
+  },
+  "serial": {
+    "control_baud": 115200,
+    "hisi_log_baud": 1500000,
+    "csk_log_baud": 115200
+  },
+  "onlyburn": [
+    "root_loaderboot_sign.bin",
+    "root_params_sign.bin",
+    "ssb_sign.bin",
+    "flashboot_sign.bin",
+    "flashboot_backup_sign.bin",
+    "ws63-liteos-app-sign.bin",
+    "efuse_cfg.bin",
+    "ws63-liteos-mfg-sign.bin"
+  ],
+  "verification": {
+    "burn_result_text": "烧写结果：成功",
+    "burn_failure_text": "烧写结果：失败",
+    "at_command": "AT+FTM=0",
+    "at_success_text": "+FTM SWITCH: start",
+    "hisi_ready_text": "CSK6 Ready !!!",
+    "csk_ready_text": "AP Boot Ready !!!",
+    "csk_version": "V4.1.8@Nov  2 2026 09:21:24",
+    "csk_build": "2026-11-02 09:21:11_1cdeeab"
+  }
+}
