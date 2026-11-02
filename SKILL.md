@@ -31,8 +31,8 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 仓库已包含运行所需资源：
 
 - `burn/Uart_Burn_Tool.exe`：CSK 烧录工具；
-- `burn/fw.img`：整镜像固件；
-- `fw/V46.99.8_20261020144346/CSK/fw.hex`：hex 固件；
+- `fw/V46.1.8_20261102093954/CSK/fw.img`：整镜像固件；
+- `fw/V46.1.8_20261102093954/CSK/fw.hex`：hex 固件；
 - `wav/Wake/hellohaier.wav`：唤醒词；
 - `wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav`：交互命令词“打开空调”（Turn on aircon）；
 - `wav/` 下的完整意图语料，供命令词扫描使用。

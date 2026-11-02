@@ -45,8 +45,8 @@
 | 检查 | 证据 | 当前固件期望 |
 |---|---|---|
 | bootloader | `>>>> bootloader application >>>>` | 出现 |
-| 版本 | `venus ap appliction(V4.99.8@Oct 20 2026 14:42:43)` | 前缀 `V4.99.8` |
-| 构建号 | `Project Build Info: 2026-10-20 14:42:30_1ac783d` | 完全一致 |
+| 版本 | `venus ap appliction(V4.1.8@Nov  2 2026 09:21:24)` | 前缀 `V4.1.8` |
+| 构建号 | `CSK-SDK Build Info: 2026-11-02 09:21:11_1cdeeab` | 完全一致 |
 | 启动原因 | `Boot Reason: POWER|HWPIN 0x03` | 记录并展示，不单独作为失败条件 |
 | 应用就绪 | `AP Boot Ready !!!` | 出现 |
 | 致命日志 | `FATAL/ASSERT FAIL/HardFault/panic/watchdog reset/Stack overflow` | 不出现 |

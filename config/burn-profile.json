@@ -674,11 +674,11 @@
       "fixtures": {
         "positive": [
           {
-            "text": "venus ap appliction(V4.99.8@Oct 20 2026 14:42:43)",
+            "text": "venus ap appliction(V4.1.8@Nov  2 2026 09:21:24)",
             "source": "csk",
             "port": "COM13",
             "role": "csk",
-            "presentation": "V4.99.8@Oct 20 2026 14:42:43"
+            "presentation": "V4.1.8@Nov  2 2026 09:21:24"
           }
         ],
         "negative": [
@@ -702,7 +702,7 @@
           "csk"
         ]
       },
-      "regex": "Project Build Info:\\s*(?P<build>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}_[0-9A-Za-z]+)",
+      "regex": "(?:Project Build Info|CSK-SDK Build Info):\\s*(?P<build>\\d{4}-\\d{2}-\\d{2}[ _]\\d{2}:\\d{2}:\\d{2}_[0-9A-Za-z]+)",
       "presentation_capture": "build",
       "display_captures": [
         {
@@ -720,11 +720,11 @@
       "fixtures": {
         "positive": [
           {
-            "text": "Project Build Info: 2026-10-20 14:42:30_1ac783d",
+            "text": "CSK-SDK Build Info: 2026-11-02 09:21:11_1cdeeab",
             "source": "csk",
             "port": "COM13",
             "role": "csk",
-            "presentation": "2026-10-20 14:42:30_1ac783d"
+            "presentation": "2026-11-02 09:21:11_1cdeeab"
           }
         ],
         "negative": [

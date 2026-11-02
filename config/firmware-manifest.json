@@ -3,20 +3,20 @@
   "chip_type": "0x60120001",
   "firmware": {
     "img": {
-      "path": "burn/fw.img",
-      "source_sha256": "b9f8c2ece3c9396a312a8c470e45e80bd3a6ef14fb34e4987dc1cda238135dc5",
-      "expected_tool_md5": "2dc44aa1d8f3c2e0dd318627a9a2fb98",
+      "path": "fw/V46.1.8_20261102093954/CSK/fw.img",
+      "source_sha256": "37de1c8e3e06d8091948cf203de14c24305a91ae96d0d64515e33ff9e72f5a21",
+      "expected_tool_md5": "c79b14c0dc9f91e96267d7f31ad9c6c9",
       "expected_write_size": 16777216,
-      "expected_version": "V4.99.8",
-      "expected_build": "2026-10-20 14:42:30_1ac783d"
+      "expected_version": "V4.1.8",
+      "expected_build": "2026-11-02 09:21:11_1cdeeab"
     },
     "hex": {
-      "path": "fw/V46.99.8_20261020144346/CSK/fw.hex",
-      "source_sha256": "ff78e9b0414f2d2ca8ed456463ebb4062a7966a846fa3d443a3e7a53af428931",
+      "path": "fw/V46.1.8_20261102093954/CSK/fw.hex",
+      "source_sha256": "06630deee41b7653a68b65740c0c95c3a120f3636f27f1af238feb747ba7bdbb",
       "expected_tool_md5": "f6d6369435d52784efe1119ebd08f582",
       "expected_write_size": 5685248,
-      "expected_version": "V4.99.8",
-      "expected_build": "2026-10-20 14:42:30_1ac783d"
+      "expected_version": "V4.1.8",
+      "expected_build": "2026-11-02 09:21:11_1cdeeab"
     }
   },
   "timing": {
