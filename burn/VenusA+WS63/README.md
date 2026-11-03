@@ -7,18 +7,16 @@ VenusA+WS63/
   VenusA+WS63/
     auto_burn.py
     run.bat
-    BurnTool_Gold/
-      BurnTool.exe
-      *.dll
-      configure/
-      platforms/
+    BurnTool_Gold.zip
+      (auto-extracted on first run)
     VenusA_Burn/
       Uart_Burn_Tool.exe
 ```
 
 `VenusA_Burn/Uart_Burn_Tool.exe` is the CSK/VenusA tool and is not used for a
-HISI-only run. HISI-only runs use `BurnTool_Gold/BurnTool.exe` through
-`auto_burn.py --skip-venusa`.
+HISI-only run. HISI-only runs use `BurnTool_Gold.zip` through
+`auto_burn.py --skip-venusa`; the archive is extracted to `BurnTool_Gold/`
+automatically on first run.
 
 The repository copy is pruned: `BurnTool_Gold/configure/config_mcu` (MCU/JTAG
 configuration for other chips) is removed. WS63/CSK essentials are retained,

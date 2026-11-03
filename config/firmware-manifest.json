@@ -2,14 +2,6 @@
   "schema_version": 1,
   "chip_type": "0x60120001",
   "firmware": {
-    "img": {
-      "path": "fw/V46.1.8_20261102093954/CSK/fw.img",
-      "source_sha256": "37de1c8e3e06d8091948cf203de14c24305a91ae96d0d64515e33ff9e72f5a21",
-      "expected_tool_md5": "c79b14c0dc9f91e96267d7f31ad9c6c9",
-      "expected_write_size": 16777216,
-      "expected_version": "V4.1.8",
-      "expected_build": "2026-11-02 09:21:11_1cdeeab"
-    },
     "hex": {
       "path": "fw/V46.1.8_20261102093954/CSK/fw.hex",
       "source_sha256": "06630deee41b7653a68b65740c0c95c3a120f3636f27f1af238feb747ba7bdbb",
@@ -32,7 +24,28 @@
   },
   "control_recovery": {
     "attempts": 20,
-    "delays_s": [0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 10.0, 15.0, 15.0, 20.0, 20.0, 25.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0],
+    "delays_s": [
+      0.5,
+      1.0,
+      2.0,
+      3.0,
+      5.0,
+      8.0,
+      10.0,
+      15.0,
+      15.0,
+      20.0,
+      20.0,
+      25.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0
+    ],
     "prompt_timeout_s": 3.0
   },
   "csk_init": {
@@ -75,7 +88,10 @@
     "min_volume": 0,
     "command_timeout_s": 15.0,
     "asr_pattern": "keyword:(?P<keyword>[^\\\"\\r\\n]+)",
-    "response_playback_patterns": ["offline_tts_callback", "soundplayer"],
+    "response_playback_patterns": [
+      "offline_tts_callback",
+      "soundplayer"
+    ],
     "attempts": 4
   },
   "interaction_acceptance": {

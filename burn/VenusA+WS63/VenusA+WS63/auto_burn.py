@@ -5,6 +5,7 @@ import signal
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -156,7 +157,13 @@ def resolve_venusa_firmware_path(firmware_root: Path, firmware_type: str) -> Pat
 
 
 def resolve_ws63_tool_path() -> Path:
-    return get_first_existing_file([SCRIPT_ROOT / "BurnTool_Gold" / "BurnTool.exe"], "WS63 burn tool")
+    tool_dir = SCRIPT_ROOT / "BurnTool_Gold"
+    tool_path = tool_dir / "BurnTool.exe"
+    archive_path = SCRIPT_ROOT / "BurnTool_Gold.zip"
+    if not tool_path.is_file() and archive_path.is_file():
+        with zipfile.ZipFile(archive_path) as archive:
+            archive.extractall(tool_dir)
+    return get_first_existing_file([tool_path], "WS63 burn tool")
 
 
 def resolve_ws63_package_path(firmware_root: Path) -> Path:

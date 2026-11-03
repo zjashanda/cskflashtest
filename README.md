@@ -5,7 +5,6 @@ CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过控制串口�
 ## Skill layout
 
 - `agents/openai.yaml`
-- `fw/V46.1.8_20261102093954/CSK/fw.img`
 - `burn/Uart_Burn_Tool.exe`
 - `config/burn-profile.json`
 - `config/devices.example.json`
@@ -84,7 +83,6 @@ Then restart Codex.
 仓库已包含运行所需资源：
 
 - `burn/Uart_Burn_Tool.exe`：CSK 烧录工具；
-- `fw/V46.1.8_20261102093954/CSK/fw.img`：整镜像固件；
 - `fw/V46.1.8_20261102093954/CSK/fw.hex`：hex 固件；
 - `fw/V46.1.8_20261102093954/HISI/ws63-liteos-app_all.fwpkg`：HISI/WS63 烧录包；
 - `wav/Wake__hellohaier_norm.wav`：唤醒词；
@@ -110,7 +108,6 @@ python -u cskflashtest/scripts/run.py --preflight
 python -u cskflashtest/scripts/run.py --rounds 1
 
 # 3. 指定固件类型
-python -u cskflashtest/scripts/run.py --rounds 1 --fw img
 python -u cskflashtest/scripts/run.py --rounds 1 --fw hex
 
 # 4. 不烧录，只验证控制时序和 CSK 启动日志
@@ -184,8 +181,6 @@ cskflashtest\run_multi.bat --rounds 100 --max-parallel 5 --stagger 2
 实际执行的命令由 `BurnToolRunner.build_args()` 生成，等价于：
 
 ```powershell
-# img
-.\Uart_Burn_Tool.exe -b 1500000 -p COM15 -c -t 10 -f <fw.img> -l -m -d -a 0x0 -s
 
 # hex
 .\Uart_Burn_Tool.exe -b 1500000 -p COM15 -c -t 10 -f <fw.hex> -l -m -d 0x00 -s
@@ -201,8 +196,8 @@ HISI 与 CSK 使用不同工具、不同固件包和不同串口波特率，完�
 
 | 项目 | CSK | HISI / WS63 |
 |---|---|---|
-| 工具 | `burn/Uart_Burn_Tool.exe` | `burn/VenusA+WS63/VenusA+WS63/BurnTool_Gold/BurnTool.exe` |
-| 固件 | `fw/.../CSK/fw.hex` / `fw.img` | `fw/.../HISI/ws63-liteos-app_all.fwpkg` |
+| 工具 | `burn/Uart_Burn_Tool.exe` | `burn/VenusA+WS63/VenusA+WS63/BurnTool_Gold.zip`（auto_burn.py 首次自动解压） |
+| 固件 | `fw/.../CSK/fw.hex` | `fw/.../HISI/ws63-liteos-app_all.fwpkg` |
 | 烧录协议波特率 | `1500000` | `1000000`（`-signalbaud`） |
 | 应用日志/AT 波特率 | `115200` | `1500000` |
 | 结果日志 | Uart_Burn_Tool 输出 + CSK 日志 | `BurnTool_Gold/optLog/optLog_*.txt` + HISI/CSK 日志 |
@@ -376,12 +371,10 @@ result/<timestamp>_cskflashtest/
 ## 固件变更
 
 ```powershell
-# 查看当前 img/hex 的 SHA-256、写入大小和映射镜像 MD5
-python cskflashtest/scripts/commission.py --key img
+# 查看当前 hex 的 SHA-256、写入大小和映射镜像 MD5
 python cskflashtest/scripts/commission.py --key hex
 
 # 固件更新后登记新哈希；hex 需要提供一次已确认正常烧录的工具 MD5
-python cskflashtest/scripts/commission.py --key img --update
 python cskflashtest/scripts/commission.py --key hex --update --tool-md5 0x...
 ```
 

@@ -6,7 +6,7 @@
 
 | 用途 | 路径 |
 |---|---|
-| HISI 烧录工具 | `burn/VenusA+WS63/VenusA+WS63/BurnTool_Gold/BurnTool.exe` |
+| HISI 烧录工具 | `burn/VenusA+WS63/VenusA+WS63/BurnTool_Gold.zip`（首次由 `auto_burn.py` 自动解压） |
 | HISI 命令行入口 | `burn/VenusA+WS63/VenusA+WS63/auto_burn.py` |
 | HISI 固件包 | `fw/V46.1.8_20261102093954/HISI/ws63-liteos-app_all.fwpkg` |
 | OTA 包（不要用于 BurnTool） | `fw/V46.1.8_20261102093954/HISI/out/update.fwpkg` |
@@ -19,7 +19,7 @@
 burn/VenusA+WS63/VenusA+WS63/
 ```
 
-运行时日志 `BurnTool_Gold/optLog/`、`BurnTool_Gold/tmp/`、`BurnTool_Gold/log.txt` 和旧的临时 fwpkg 不入库，避免把历史运行数据混进仓库。
+工具本体以 `BurnTool_Gold.zip` 保存；运行时会自动解压到同目录的 `BurnTool_Gold/`。解压目录、`optLog/`、`tmp/`、`log.txt` 和旧的临时 fwpkg 不入库，避免把历史运行数据混进仓库。
 
 `auto_burn.py` 会从这里读取 `BurnTool_Gold/BurnTool.exe`。如果目标机器没有该目录，直接从仓库拉取 `burn/VenusA+WS63` 即可。
 
