@@ -5,12 +5,9 @@ CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过控制串口�
 ## Skill layout
 
 - `agents/openai.yaml`
-- `burn/Uart_Burn_Tool.exe`
 - `config/burn-profile.json`
 - `config/devices.example.json`
-- `config/devices.json`
 - `config/firmware-manifest.json`
-- `fw/V46.1.8_20261102093954/CSK/fw.hex`
 - `install_requirements.bat`
 - `lstest/scripts/__init__.py`
 - `lstest/scripts/adapter_guard.py`
@@ -31,6 +28,7 @@ CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过控制串口�
 - `lstest/scripts/timing.py`
 - `preflight.bat`
 - `references/hisi-burn.md`
+- `references/manual-assets.md`
 - `references/multi-device.md`
 - `references/operations.md`
 - `references/verification.md`
@@ -54,6 +52,16 @@ Copy this folder into:
 ```
 
 Then restart Codex.
+
+## 云端导入包
+
+为了让导入器通过 **1MB/单文件** 限制，云端仓库只保留脚本、配置、文档和 75 个 wav 音频：
+
+- 不包含 `fw/` 下的 CSK/HISI 固件；
+- 不包含 `burn/` 下的烧录工具和厂商工具包；
+- 实际烧录前，从本地或可信介质按 [手动资产清单](references/manual-assets.md) 补齐路径，并核对 SHA-256；本机端口配置 `config/devices.json` 不上传。
+
+**本机原有固件、工具和测试日志不删除。**云端删除只是让受限客户端能导入；没有手动补资产的客户端不能直接烧录。导入时使用最新 `main`，不要沿用含大文件的旧快照。
 
 ## Usage and workflow
 
@@ -80,7 +88,7 @@ Then restart Codex.
 
 ## 附带资源
 
-仓库已包含运行所需资源：
+云端只包含脚本、配置、文档和 WAV；下列工具与固件**必须手动添加**，清单、大小及 SHA-256 见 [references/manual-assets.md](references/manual-assets.md)：
 
 - `burn/Uart_Burn_Tool.exe`：CSK 烧录工具；
 - `fw/V46.1.8_20261102093954/CSK/fw.hex`：hex 固件；
@@ -96,7 +104,7 @@ Then restart Codex.
 - Windows + Python 3.10+；
 - 首次运行执行 `install_requirements.bat`，或 `python -m pip install -r requirements.txt`；
 - 需要 FFmpeg 用于音频转换，`tts` 需要 `edge-tts`，播放需要 `pygame`，串口需要 `pyserial`；
-- 设备信息只需修改 `config/devices.json`，其余脚本、音频、烧录工具、固件和内置 `lstest/scripts` 已随仓库提供。
+- `config/devices.json` 是本地端口配置；云端提供脚本、音频和内置 `lstest/scripts`，固件与工具须手动补齐。
 
 ## 快速开始
 
@@ -104,7 +112,7 @@ Then restart Codex.
 # 1. 无设备动作预检（profile fixture、固件哈希、端口、控制 shell）
 python -u cskflashtest/scripts/run.py --preflight
 
-# 2. 单轮实际烧录，默认优先 hex；没有 hex 自动使用 img
+# 2. 手动补齐资产后执行单轮 hex 烧录
 python -u cskflashtest/scripts/run.py --rounds 1
 
 # 3. 指定固件类型

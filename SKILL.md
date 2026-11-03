@@ -7,6 +7,8 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 
 本 Skill 只服务当前 CSK 烧录项目，不复制、不修改 `lstest`。运行时把 `lstest` 当作公共库，复用其 `TaskArtifacts`、`DeviceProfile`、`ScenarioRuntime`、`ToolLogValidator` 和四类产物标准。
 
+云端只分发脚本、配置、文档和 WAV；本地烧录固件与厂商工具保持原样，不上传。其他客户端下载后按 [手动资产清单](references/manual-assets.md) 补齐烧录所需文件。未补齐前只能使用无需烧录资产的功能，不能直接烧录。
+
 ## 适用场景
 
 - 单次 CSK 串口烧录验证；
@@ -28,7 +30,7 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 
 ## 附带资源
 
-仓库已包含运行所需资源：
+云端导入包只包含脚本、配置、文档和 WAV；烧录工具及固件均**不随云端上传**，本地已验证的文件保持原样。烧录前按 [references/manual-assets.md](references/manual-assets.md) 手动添加并校验。以下烧录路径是手动补齐的目标位置：
 
 - `burn/Uart_Burn_Tool.exe`：CSK 烧录工具；
 - `fw/V46.1.8_20261102093954/CSK/fw.hex`：hex 固件；
@@ -44,7 +46,7 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 - Windows + Python 3.10+；
 - 首次运行执行 `install_requirements.bat`，或 `python -m pip install -r requirements.txt`；
 - 需要 FFmpeg 用于音频转换，`tts` 需要 `edge-tts`，播放需要 `pygame`，串口需要 `pyserial`；
-- 设备信息只需修改 `config/devices.json`，其余脚本、音频、烧录工具、固件和内置 `lstest/scripts` 已随仓库提供。
+- `config/devices.json` 是本地端口配置，不上传云端；云端提供脚本、音频和内置 `lstest/scripts`，固件与工具须按 [手动资产清单](references/manual-assets.md) 补齐。
 
 ## 快速开始
 
@@ -52,7 +54,7 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 # 1. 无设备动作预检（profile fixture、固件哈希、端口、控制 shell）
 python -u cskflashtest/scripts/run.py --preflight
 
-# 2. 单轮实际烧录，默认优先 hex；没有 hex 自动使用 img
+# 2. 手动补齐资产后执行单轮 hex 烧录
 python -u cskflashtest/scripts/run.py --rounds 1
 
 # 3. 指定固件类型
