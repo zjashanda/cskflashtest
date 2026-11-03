@@ -1,1 +1,12 @@
 config/devices.json
+.opencode/
+burn/**
+!burn/VenusA+WS63/
+burn/VenusA+WS63/**
+!burn/VenusA+WS63/VenusA+WS63/
+burn/VenusA+WS63/VenusA+WS63/**
+!burn/VenusA+WS63/VenusA+WS63/auto_burn.py
+fw/
+result/
+multi_logs/
+logs/
