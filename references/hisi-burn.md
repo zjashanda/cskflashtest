@@ -13,17 +13,17 @@
 
 `VenusA_Burn/Uart_Burn_Tool.exe` 只能用于 CSK/VenusA，不能用于 HISI。
 
-工具包是厂商 GUI/命令行包，已纳入仓库：
+厂商 GUI/命令行工具和固件**不上传云端**。使用前按 [手动资产清单](manual-assets.md) 把工具与 HISI 固件复制到目标路径：
 
 ```text
 burn/VenusA+WS63/VenusA+WS63/
 ```
 
-工具本体以 `BurnTool_Gold.zip` 保存；运行时会自动解压到同目录的 `BurnTool_Gold/`。解压目录、`optLog/`、`tmp/`、`log.txt` 和旧的临时 fwpkg 不入库，避免把历史运行数据混进仓库。
+本地工具本体以 `BurnTool_Gold.zip` 保存；运行时会自动解压到同目录的 `BurnTool_Gold/`。这些大文件和解压目录、`optLog/`、`tmp/`、`log.txt` 都不进入云端导入包。
 
-`auto_burn.py` 会从这里读取 `BurnTool_Gold/BurnTool.exe`。如果目标机器没有该目录，直接从仓库拉取 `burn/VenusA+WS63` 即可。
+`auto_burn.py` 随云端导入；首次执行前必须手动放置 `BurnTool_Gold.zip`，脚本解压后读取 `BurnTool_Gold/BurnTool.exe`。仅拉取仓库不能直接烧录。
 
-仓库版本已做精简：移除 `configure/config_mcu`（纯 MCU/JTAG 配置，WS63 UART 烧录不需要），保留 WS63/CSK 需要的 `BurnTool.exe`、Qt DLL、`config_WS63`、WS63 chip-type 配置和 `VenusA_Burn`。精简后已用同一套工具重新烧录 dev01，`烧写结果：成功` 且 `AT+FTM=0` 返回 `OK`。
+本地工具包已去除无关的 `configure/config_mcu`，保留 WS63 所需配置；历史 dev01 验证记录为 `烧写结果：成功` 且 `AT+FTM=0` 返回 `OK`。联合烧录还需要手动添加 `VenusA_Burn/Uart_Burn_Tool.exe`。
 
 ## 2. 固件校验
 
