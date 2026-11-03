@@ -1,2 +1,0 @@
-python .\auto_burn.py --firmware-root "D:\midea_openclaw_test\¹Ì¼şÏÂÔØ\¹Ì¼ş\Midea_VenusA_WS63_35.03.01.01.20.26.08.04.00.01_20260817_153628" --control-port COM4  --venusa-port COM6 --ws63-port COM5
-pause
