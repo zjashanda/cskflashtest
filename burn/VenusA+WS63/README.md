@@ -20,6 +20,12 @@ VenusA+WS63/
 HISI-only run. HISI-only runs use `BurnTool_Gold/BurnTool.exe` through
 `auto_burn.py --skip-venusa`.
 
+The repository copy is pruned: `BurnTool_Gold/configure/config_mcu` (MCU/JTAG
+configuration for other chips) is removed. WS63/CSK essentials are retained,
+including `config_WS63`, chip-type INI files, the Qt DLLs and the vendor
+`Uart_Burn_Tool.exe`. The pruned copy was re-tested on dev01: BurnTool returned
+`烧写结果：成功` and `AT+FTM=0` returned `OK`.
+
 Runtime output is intentionally excluded from git:
 
 ```text
