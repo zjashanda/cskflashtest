@@ -20,27 +20,26 @@ RAW.mkdir(parents=True, exist_ok=True)
 RESULTS = WORK / "results.csv"
 SUMMARY = WORK / "summary.txt"
 KEY = "VID_8765&PID_5678:9_2A847557_0_0000"
-WAKE = str(WAV_DIR / "Wake" / "hellohaier.wav")
+WAKE = str(WAV_DIR / "Wake__hellohaier_norm.wav")
 PLAY = ROOT / "lstest" / "scripts" / "listenai_play.py"
 if not PLAY.exists():
     PLAY = SKILL_ROOT / "lstest" / "scripts" / "listenai_play.py"
 
 
-def audio_files(folder):
+def audio_files():
     return sorted(
-        p for p in folder.iterdir()
-        if p.is_file() and p.suffix.lower() in (".wav", ".m4a", ".mp3")
+        p for p in WAV_DIR.iterdir()
+        if p.is_file() and p.suffix.lower() in (".wav", ".m4a", ".mp3") and "__" in p.stem
     )
 
 
 def select_items():
     items = []
-    for folder in sorted(WAV_DIR.iterdir()):
-        if not folder.is_dir() or folder.name.startswith("_") or folder.name == "Wake":
+    for src in audio_files():
+        intent = src.name.split("__", 1)[0]
+        if intent == "Wake":
             continue
-        files = audio_files(folder)
-        for src in files[:2]:
-            items.append((folder.name, src))
+        items.append((intent, src))
     return items
 
 
@@ -200,7 +199,7 @@ def main():
             device.apply_pa()
             device.set_volume(100)
             for index, (intent, src) in enumerate(items, 1):
-                norm_path = normalize(src, NORM / f"{intent}__{src.stem}.wav")
+                norm_path = normalize(src, NORM / src.name)
                 device.set_volume(100)
                 device.apply_pa()
                 device.ctl.reset_input_buffer()

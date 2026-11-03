@@ -34,9 +34,9 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 - `fw/V46.1.8_20261102093954/CSK/fw.img`：整镜像固件；
 - `fw/V46.1.8_20261102093954/CSK/fw.hex`：hex 固件；
 - `fw/V46.1.8_20261102093954/HISI/ws63-liteos-app_all.fwpkg`：HISI/WS63 烧录包；
-- `wav/Wake/hellohaier.wav`：唤醒词；
-- `wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav`：交互命令词“打开空调”（Turn on aircon）；
-- `wav/` 下的完整意图语料，供命令词扫描使用。
+- `wav/Wake__hellohaier_norm.wav`：唤醒词；
+- `wav/Turn-on-aircon__BH123_SE_F003_normal_061.wav`：交互命令词“打开空调”（Turn on aircon）；
+- `wav/*.wav`：每个意图保留 1 个 normal 文件，全部平铺在 `wav/` 下。
 
 本仓库已内置运行所需的 `lstest/scripts` 公共运行时；完整 `lstest` 测试和文档不包含。若项目根目录另有 `lstest`，脚本优先使用项目根目录版本。
 
@@ -303,7 +303,7 @@ python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json
 唤醒成功后播报命令词“打开空调”：
 
 ```text
-wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav
+wav/Turn-on-aircon__BH123_SE_F003_normal_061.wav
 ```
 
 单轮交互结果统一为四种：

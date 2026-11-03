@@ -658,7 +658,7 @@ class BurnScenario:
         wake_patterns = [re.compile(str(item), re.I) for item in self.wake.get("wake_patterns", []) if str(item)]
         wake_cursor = self.csk.snapshot()
         control_cursor = self.control.snapshot()
-        play_file = asset_path(Path(str(self.wake.get("audio_file", "wav/Wake/hellohaier.wav"))))
+        play_file = asset_path(Path(str(self.wake.get("audio_file", "wav/Wake__hellohaier_norm.wav"))))
         play_key = str(self.wake.get("render_device_key", ""))
         proc = subprocess.Popen(
             [sys.executable, "-u", str(lstest_script("listenai_play.py")),
@@ -743,7 +743,7 @@ class BurnScenario:
         for attempt in range(1, attempts + 1):
             play_cursor = self.csk.snapshot()
             control_cursor = self.control.snapshot()
-            play_file = asset_path(Path(str(self.wake.get("audio_file", "wav/Wake/hellohaier.wav"))))
+            play_file = asset_path(Path(str(self.wake.get("audio_file", "wav/Wake__hellohaier_norm.wav"))))
             play_key = str(self.wake.get("render_device_key", ""))
             command = [
                 sys.executable, "-u", str(lstest_script("listenai_play.py")),
@@ -893,7 +893,7 @@ class BurnScenario:
                     continue
             play_cursor = self.csk.snapshot()
             control_cursor = self.control.snapshot()
-            play_file = asset_path(Path(str(cfg.get("audio_file", "wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav"))))
+            play_file = asset_path(Path(str(cfg.get("audio_file", "wav/Turn-on-aircon__BH123_SE_F003_normal_061.wav"))))
             play_key = str(self.wake.get("render_device_key", ""))
             command = [
                 sys.executable, "-u", str(lstest_script("listenai_play.py")),

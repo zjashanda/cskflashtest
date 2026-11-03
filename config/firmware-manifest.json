@@ -52,7 +52,7 @@
     "retries": 2
   },
   "wake": {
-    "audio_file": "wav/Wake/hellohaier.wav",
+    "audio_file": "wav/Wake__hellohaier_norm.wav",
     "render_device_key": "VID_8765&PID_5678:9_2A847557_0_0000",
     "language_command": "algo.switch.lang 0",
     "language_success_pattern": "algo_lang switch to 0 success",
@@ -70,7 +70,7 @@
     ]
   },
   "interaction": {
-    "audio_file": "wav/Turn-on-aircon/BH123_SE_F003_normal_061.wav",
+    "audio_file": "wav/Turn-on-aircon__BH123_SE_F003_normal_061.wav",
     "expected_keyword": "Turn on aircon",
     "min_volume": 0,
     "command_timeout_s": 15.0,
