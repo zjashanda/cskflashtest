@@ -18,6 +18,10 @@ except ImportError:
 
 
 SCRIPT_ROOT = Path(__file__).resolve().parent
+SKILL_ROOT = SCRIPT_ROOT.parents[2]
+if str(SKILL_ROOT) not in sys.path:
+    sys.path.insert(0, str(SKILL_ROOT))
+from scripts.ensure_assets import AssetBootstrapError, ensure_assets
 CONTROL_RESTART_COMMANDS = ["uut-switch1.off", "uut-switch1.on"]
 VENUSA_PREPARE_COMMANDS = ["uut-switch1.off", "uut-csk-boot.on", "uut-switch1.on", "uut-csk-boot.off"]
 WS63_ONLYBURN_ARGUMENTS = [
@@ -642,6 +646,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.skip_ws63 and not args.ws63_port:
         raise BurnError("ws63-port is required when WS63 burn is enabled.")
 
+    try:
+        ensure_assets(SKILL_ROOT)
+    except AssetBootstrapError as exc:
+        raise BurnError(f"asset bootstrap failed: {exc}") from exc
     firmware_root = resolve_firmware_root_path(args.firmware_root)
     control_port = normalize_port_name(args.control_port)
     venusa_port = normalize_port_name(args.venusa_port) if not args.skip_venusa else ""
