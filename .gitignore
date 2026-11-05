@@ -10,3 +10,6 @@ fw/
 result/
 multi_logs/
 logs/
+.asset-bootstrap.lock
+__pycache__/
+*.pyc

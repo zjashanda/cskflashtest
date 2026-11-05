@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "archive_url": "https://listenai-firmware-delivery.oss-cn-beijing.aliyuncs.com/bszheng/csk6hisiflashtools.zip",
+  "archive_size": 32689775,
+  "archive_sha256": "128ae7fdb513d7aa5df65a36560c58944f098e88e953096cf9c9d13741ecb076",
+  "archive_root": "csk6hisiflashtools/",
+  "assets": [
+    {
+      "path": "burn/Uart_Burn_Tool.exe",
+      "size": 83968,
+      "sha256": "4bfdf6800b32dc9fa7ed5e17f039dc1ea4a7f049c25acfc98f83e3dcfcf197bb"
+    },
+    {
+      "path": "burn/VenusA+WS63/VenusA+WS63/BurnTool_Gold.zip",
+      "size": 15571883,
+      "sha256": "f771e75ca6d75bbf775c52ce75dd89ffcd2fe85aea497098a1672fffd88ace01"
+    },
+    {
+      "path": "burn/VenusA+WS63/VenusA+WS63/VenusA_Burn/Uart_Burn_Tool.exe",
+      "size": 10882782,
+      "sha256": "40a467816e2734f07f04fe9c76611f8c77becdf9dabb420e46ea59494752f507"
+    },
+    {
+      "path": "fw/V46.1.8_20261102093954/CSK/fw.hex",
+      "size": 15969403,
+      "sha256": "06630deee41b7653a68b65740c0c95c3a120f3636f27f1af238feb747ba7bdbb"
+    },
+    {
+      "path": "fw/V46.1.8_20261102093954/CSK/fw.img",
+      "size": 16777216,
+      "sha256": "37de1c8e3e06d8091948cf203de14c24305a91ae96d0d64515e33ff9e72f5a21"
+    },
+    {
+      "path": "fw/V46.1.8_20261102093954/HISI/ws63-liteos-app_all.fwpkg",
+      "size": 3658512,
+      "sha256": "2968071cff99b51c50b58e0eba2ab561f901d6668e6346a53c2adc81f6b9dd88"
+    },
+    {
+      "path": "fw/V46.1.8_20261102093954/md5_20261102093954.txt",
+      "size": 179,
+      "sha256": "c73b727733b6bb14fe467577abdb668b57417d6602bb7a87074da4a9f0d89c15"
+    }
+  ]
+}
