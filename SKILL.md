@@ -7,7 +7,7 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 
 本 Skill 只服务当前 CSK 烧录项目，不复制、不修改 `lstest`。运行时把 `lstest` 当作公共库，复用其 `TaskArtifacts`、`DeviceProfile`、`ScenarioRuntime`、`ToolLogValidator` 和四类产物标准。
 
-云端只分发脚本、配置、文档和 WAV；本地烧录固件与厂商工具保持原样，不上传。其他客户端下载后按 [手动资产清单](references/manual-assets.md) 补齐烧录所需文件。未补齐前只能使用无需烧录资产的功能，不能直接烧录。
+云端只分发脚本、配置、文档和 WAV；本地烧录固件与厂商工具保持原样，不上传。其他客户端下载后，烧录预检或 HISI 入口会优先从 OSS 资产包恢复缺失文件；无网络时按 [手动资产清单](references/manual-assets.md) 手动补齐。未补齐前只能使用无需烧录资产的功能，不能直接烧录。
 
 ## 适用场景
 

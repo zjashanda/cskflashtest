@@ -59,7 +59,7 @@ Then restart Codex.
 
 - 不包含 `fw/` 下的 CSK/HISI 固件；
 - 不包含 `burn/` 下的烧录工具和厂商工具包；
-- 实际烧录前，从本地或可信介质按 [手动资产清单](references/manual-assets.md) 补齐路径，并核对 SHA-256；本机端口配置 `config/devices.json` 不上传。
+- 实际烧录前，优先从 OSS 资产包自动恢复；网络不可用时，再从本地或可信介质按 [手动资产清单](references/manual-assets.md) 补齐路径，并核对 SHA-256；本机端口配置 `config/devices.json` 不上传。
 
 **本机原有固件、工具和测试日志不删除。**云端删除只是让受限客户端能导入；没有手动补资产的客户端不能直接烧录。导入时使用最新 `main`，不要沿用含大文件的旧快照。
 
