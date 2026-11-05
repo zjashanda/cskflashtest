@@ -55,6 +55,7 @@ from burn_adapter import (  # noqa: E402
     port_available,
     send_control,
 )
+from ensure_assets import AssetBootstrapError, ensure_assets  # noqa: E402
 
 CHILD_CREATIONFLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
@@ -289,6 +290,21 @@ class BurnScenario:
     # ---------- preflight ----------
     def preflight(self) -> list[str]:
         errors: list[str] = []
+        if self.mode == "burn":
+            try:
+                bootstrap = ensure_assets(SKILL_ROOT)
+                restored = bootstrap.get("restored", [])
+                if restored:
+                    self._emit(
+                        "SYSTEM",
+                        "ASSET_BOOTSTRAP",
+                        f"已从云端资产包恢复 {len(restored)} 个烧录资产",
+                        status="PASS",
+                        raw={"assets": restored},
+                    )
+            except AssetBootstrapError as exc:
+                errors.append(f"asset bootstrap: {exc}")
+                self._emit("SYSTEM", "ASSET_BOOTSTRAP_BLOCKED", str(exc), level="ERROR", status="FAIL")
         try:
             self.profile.assert_formal_ready()
             self._emit("SYSTEM", "PROFILE_READY", f"profile 校验通过: {self.profile.profile_id}", status="PASS")
