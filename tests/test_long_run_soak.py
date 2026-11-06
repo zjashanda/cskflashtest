@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
 
-from lstest.scripts.timeline import TimelineLedger, ToolLogValidator
-from scripts.burn_adapter import MAX_PARSER_BUFFER, SerialCollector
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+
+from lstest_env import ensure_lstest_runtime  # noqa: E402
+
+ensure_lstest_runtime()
+
+from lstest.scripts.timeline import TimelineLedger, ToolLogValidator  # noqa: E402
+from scripts.burn_adapter import MAX_PARSER_BUFFER, SerialCollector  # noqa: E402
 
 
 class LongRunSoakTests(unittest.TestCase):

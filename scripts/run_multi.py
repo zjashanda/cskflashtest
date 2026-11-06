@@ -25,8 +25,13 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = SKILL_ROOT.parent
 RUN_PY = SKILL_ROOT / "scripts" / "run.py"
 MAX_DEVICES = 10
-if str(SKILL_ROOT) not in sys.path:
-    sys.path.insert(0, str(SKILL_ROOT))
+for import_root in (SKILL_ROOT, SKILL_ROOT / "scripts", PROJECT_ROOT):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
+
+from lstest_env import ensure_lstest_runtime, lstest_script  # noqa: E402
+
+LSTEST_ROOT = ensure_lstest_runtime()
 
 from lstest.scripts.environment_cleanup import (  # noqa: E402
     KillOnCloseJob,
@@ -132,7 +137,7 @@ def cleanup_before_run(devices: list[dict]) -> None:
     )
     removed = cleanup_temp_files(Path(tempfile.gettempdir()), "tmp*.wav", 3600)
     render_keys: set[str] = set()
-    play_script = SKILL_ROOT / "lstest" / "scripts" / "listenai_play.py"
+    play_script = lstest_script("listenai_play.py")
     if play_script.is_file():
         try:
             result = subprocess.run(

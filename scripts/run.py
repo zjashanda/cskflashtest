@@ -31,6 +31,10 @@ sys.path.insert(0, str(SKILL_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
+from lstest_env import ensure_lstest_runtime, lstest_script  # noqa: E402
+
+LSTEST_ROOT = ensure_lstest_runtime()
+
 from lstest.scripts.core import CaseResult, TaskArtifacts  # noqa: E402
 from lstest.scripts.profile import DeviceProfile, ProfileFixtureRunner, RawLogRecord  # noqa: E402
 from lstest.scripts.interaction_acceptance import (  # noqa: E402
@@ -147,15 +151,6 @@ def asset_path(relative: Path) -> Path:
         if candidate.exists():
             return candidate
     return PROJECT_ROOT / relative
-
-
-def lstest_script(name: str) -> Path:
-    """Resolve a bundled lstest script under the project first, then the skill repo."""
-    for base in (PROJECT_ROOT, SKILL_ROOT):
-        candidate = base / "lstest" / "scripts" / name
-        if candidate.is_file():
-            return candidate
-    return PROJECT_ROOT / "lstest" / "scripts" / name
 
 
 def find_evidence(events: list[LineEvent], pattern: re.Pattern[str]) -> list[str]:

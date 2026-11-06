@@ -21,9 +21,11 @@ RESULTS = WORK / "results.csv"
 SUMMARY = WORK / "summary.txt"
 KEY = "VID_8765&PID_5678:9_2A847557_0_0000"
 WAKE = str(WAV_DIR / "Wake__hellohaier_norm.wav")
-PLAY = ROOT / "lstest" / "scripts" / "listenai_play.py"
-if not PLAY.exists():
-    PLAY = SKILL_ROOT / "lstest" / "scripts" / "listenai_play.py"
+if str(SKILL_ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+from lstest_env import lstest_script  # noqa: E402
+
+PLAY = str(lstest_script("listenai_play.py"))
 
 
 def audio_files():

@@ -39,14 +39,29 @@ description: CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过
 - `wav/Turn-on-aircon__BH123_SE_F003_normal_061.wav`：交互命令词“打开空调”（Turn on aircon）；
 - `wav/*.wav`：每个意图保留 1 个 normal 文件，全部平铺在 `wav/` 下。
 
-本仓库已内置运行所需的 `lstest/scripts` 公共运行时；完整 `lstest` 测试和文档不包含。若项目根目录另有 `lstest`，脚本优先使用项目根目录版本。
+本仓库**不内置** `lstest` 副本，运行时依赖外部 `lstest` 公共库，复用其 `TaskArtifacts`、`DeviceProfile`、`ScenarioRuntime`、`ToolLogValidator` 和四类产物标准。入口按以下顺序解析 `lstest`，找不到直接报错，不回退到任何内置副本：
+
+1. 已可导入的 `lstest` 包（`pip install`）；
+2. 环境变量 `LSTEST_HOME` 指向 lstest 仓库根目录；
+3. 与本仓库同级的 `lstest` 目录（现场机器历史布局）。
+
+## 云端导入包
+
+为了让导入器通过 **1MB/单文件** 限制，云端仓库只保留脚本、配置、文档和 75 个 wav 音频：
+
+- 不包含 `fw/` 下的 CSK/HISI 固件；
+- 不包含 `burn/` 下的烧录工具和厂商工具包；
+- 实际烧录前，优先从 OSS 资产包自动恢复；网络不可用时，再从本地或可信介质按 [手动资产清单](references/manual-assets.md) 补齐路径，并核对 SHA-256；本机端口配置 `config/devices.json` 不上传。
+
+**本机原有固件、工具和测试日志不删除。**云端删除只是让受限客户端能导入；没有手动补资产的客户端不能直接烧录。导入时使用最新 `main`，不要沿用含大文件的旧快照。
 
 ## 环境准备
 
 - Windows + Python 3.10+；
 - 首次运行执行 `install_requirements.bat`，或 `python -m pip install -r requirements.txt`；
-- 需要 FFmpeg 用于音频转换，`tts` 需要 `edge-tts`，播放需要 `pygame`，串口需要 `pyserial`；
-- `config/devices.json` 是本地端口配置，不上传云端；云端提供脚本、音频和内置 `lstest/scripts`，固件与工具须按 [手动资产清单](references/manual-assets.md) 补齐。
+- `lstest` 公共运行时（必需，不随本仓库分发）：`python -m pip install "lstest @ git+https://github.com/zjashanda/lstest.git@<commit>"`，或设 `LSTEST_HOME`，或把 `lstest` 检出到与本仓库同级；
+- 需要 FFmpeg 用于音频转换，播放需要 `pygame`，串口需要 `pyserial`；语音合成由 `lstest` 统一走 `lstts`，本仓库不再依赖 `edge-tts`；
+- `config/devices.json` 是本地端口配置，不上传云端；云端提供脚本、音频与依赖声明，固件与工具须按 [手动资产清单](references/manual-assets.md) 补齐。
 
 ## 快速开始
 
@@ -347,7 +362,7 @@ python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json
 
 ## 压测前初始化清理
 
-`run_multi.py` 启动前自动调用 `lstest/scripts/environment_cleanup.py`：
+`run_multi.py` 启动前自动调用 `lstest` 的 `environment_cleanup`：
 
 - 清空 `logs/audio_slots`；
 - 杀掉残留的 `listenai_play.py` / `internal-play-once` 进程；
@@ -356,7 +371,7 @@ python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json
 
 ## 串口断开重连
 
-控制口无提示符时，`run.py` 调用 `lstest/scripts/serial_recovery.py`：
+控制口无提示符时，`run.py` 调用 `lstest` 的 `serial_recovery`：
 
 - 最多 20 次重开；
 - 等待从 0.5s 起逐步延长到 30s；
@@ -435,5 +450,5 @@ python cskflashtest/scripts/commission.py --key hex --update --tool-md5 0x...
 
 - CSK 主流程不包含 HISI 烧录；HISI/WS63 使用独立工具，步骤见 [references/hisi-burn.md](references/hisi-burn.md)；
 - 不把烧录工具输出写进 `tool.log`；
-- 不修改 `lstest` 目录；
+- 不修改 `lstest` 仓库（外部依赖，只读引用）；
 - 不在预检失败时猜测日志含义或继续上电烧录。
