@@ -5,7 +5,7 @@
 如果目标电脑可以访问公网，Skill 会在烧录预检或 HISI 命令行入口发现资产缺失时自动下载并校验：
 
 ```text
-https://listenai-firmware-delivery.oss-cn-beijing.aliyuncs.com/bszheng/csk6hisiflashtools.zip
+https://listenai-test-internal.oss-cn-beijing.aliyuncs.com/exe/bszheng/csk6hisiflashtools.zip
 ```
 
 资产包大小为 `32689775` 字节，SHA-256 为：
