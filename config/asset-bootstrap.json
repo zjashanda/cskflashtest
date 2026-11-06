@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "archive_url": "https://listenai-firmware-delivery.oss-cn-beijing.aliyuncs.com/bszheng/csk6hisiflashtools.zip",
+  "archive_url": "https://listenai-test-internal.oss-cn-beijing.aliyuncs.com/exe/bszheng/csk6hisiflashtools.zip",
   "archive_size": 32689775,
   "archive_sha256": "128ae7fdb513d7aa5df65a36560c58944f098e88e953096cf9c9d13741ecb076",
   "archive_root": "csk6hisiflashtools/",
