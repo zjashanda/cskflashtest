@@ -4,44 +4,115 @@ CSK 串口烧录与烧录压测项目 Skill。Use when 需要通过控制串口�
 
 ## Skill layout
 
+- `.gitignore`
+- `SKILL.md`
 - `agents/openai.yaml`
+- `burn/VenusA+WS63/VenusA+WS63/auto_burn.py`
+- `config/asset-bootstrap.json`
 - `config/burn-profile.json`
 - `config/devices.example.json`
 - `config/firmware-manifest.json`
+- `config/hisi-burn-manifest.json`
 - `install_requirements.bat`
-- `lstest/scripts/__init__.py`
-- `lstest/scripts/adapter_guard.py`
-- `lstest/scripts/audio_synthesis.py`
-- `lstest/scripts/core.py`
-- `lstest/scripts/install_laid_linux.sh`
-- `lstest/scripts/install_laid_windows.ps1`
-- `lstest/scripts/listenai_play.py`
-- `lstest/scripts/lstest.py`
-- `lstest/scripts/observations.py`
-- `lstest/scripts/playback.py`
-- `lstest/scripts/profile.py`
-- `lstest/scripts/runtime.py`
-- `lstest/scripts/serial_capture.py`
-- `lstest/scripts/shell.py`
-- `lstest/scripts/smoke.py`
-- `lstest/scripts/timeline.py`
-- `lstest/scripts/timing.py`
 - `preflight.bat`
+- `preflight_powercycle.bat`
 - `references/hisi-burn.md`
+- `references/long-run-stability.md`
 - `references/manual-assets.md`
 - `references/multi-device.md`
 - `references/operations.md`
 - `references/verification.md`
 - `requirements.txt`
 - `run_multi.bat`
+- `run_powercycle.bat`
 - `scripts/burn_adapter.py`
 - `scripts/commission.py`
+- `scripts/ensure_assets.py`
+- `scripts/lstest_env.py`
 - `scripts/run.py`
 - `scripts/run_multi.py`
 - `scripts/scan_commands.py`
-- `SKILL.md`
 - `tests/test_burn_profile.py`
+- `tests/test_long_run_soak.py`
 - `tests/test_multi_device.py`
+- `tests/test_serial_fact_store.py`
+- `verify_burn.bat`
+- `verify_powercycle.bat`
+- `wav/Adjust-to-coldest__BH123_SE_F001_normal_073.wav`
+- `wav/Adjust-to-hottest__BH123_SE_F001_normal_072.wav`
+- `wav/Automatic-fan-speed__BH123_SE_F001_normal_096.wav`
+- `wav/Automatic-mode__BH123_SE_F002_normal_069.wav`
+- `wav/Avoid-me__BH123_SE_F001_normal_124.wav`
+- `wav/Blow-downward__BH123_SE_F001_normal_117.wav`
+- `wav/Blow-on-me__BH123_SE_F001_normal_121.wav`
+- `wav/Blow-to-the-left__BH123_SE_F003_normal_111.wav`
+- `wav/Blow-to-the-middle__BH123_SE_F001_normal_119.wav`
+- `wav/Blow-to-the-right__BH123_SE_F004_normal_113.wav`
+- `wav/Blow-upward__BH123_SE_F004_normal_115.wav`
+- `wav/Cooling-mode__BH123_SE_F001_normal_065.wav`
+- `wav/De-humidification-mode__BH123_SE_F001_normal_067.wav`
+- `wav/Decrease-fan-speed__BH123_SE_F001_normal_092.wav`
+- `wav/Decrease-temperature__BH123_SE_F001_normal_071.wav`
+- `wav/Eighteen-degrees__BH123_SE_F001_normal_078.wav`
+- `wav/Fan-mode__BH123_SE_F004_normal_068.wav`
+- `wav/Follow-me__BH123_SE_F010_normal_122.wav`
+- `wav/Heating-mode__BH123_SE_F001_normal_066.wav`
+- `wav/High-fan-speed__BH123_SE_F004_normal_093.wav`
+- `wav/Increase-fan-speed__BH123_SE_F001_normal_091.wav`
+- `wav/Increase-temperature__BH123_SE_F001_normal_070.wav`
+- `wav/Low-fan-speed__BH123_SE_F001_normal_095.wav`
+- `wav/Mid-fan-speed__BH123_SE_F001_normal_094.wav`
+- `wav/Nineteen-degrees__BH123_SE_F001_normal_079.wav`
+- `wav/Seventeen-degrees__BH123_SE_F001_normal_077.wav`
+- `wav/Sixteen-degrees__BH123_SE_F002_normal_076.wav`
+- `wav/Swing-to-the-downward__BH123_SE_F001_normal_118.wav`
+- `wav/Swing-to-the-left__BH123_SE_F001_normal_112.wav`
+- `wav/Swing-to-the-middle__BH123_SE_F003_normal_120.wav`
+- `wav/Swing-to-the-right__BH123_SE_F004_normal_114.wav`
+- `wav/Swing-to-the-upward__BH123_SE_F004_normal_116.wav`
+- `wav/Thirty-degrees__BH123_SE_F001_normal_090.wav`
+- `wav/Too-cold__BH123_SE_F001_normal_075.wav`
+- `wav/Too-hot__BH123_SE_F001_normal_074.wav`
+- `wav/Turn-down-volume__Turn down volume_norm.wav`
+- `wav/Turn-off-AC__BH123_SE_F001_normal_064.wav`
+- `wav/Turn-off-ECO__BH123_SE_F004_normal_134.wav`
+- `wav/Turn-off-Health__BH123_SE_F003_normal_126.wav`
+- `wav/Turn-off-aircon__BH123_SE_F003_normal_063.wav`
+- `wav/Turn-off-left-right-swing__BH123_SE_F001_normal_099.wav`
+- `wav/Turn-off-quiet-mode__BH123_SE_F002_normal_104.wav`
+- `wav/Turn-off-self-cleaning__BH123_SE_F001_normal_102.wav`
+- `wav/Turn-off-turbo__BH123_SE_F002_normal_110.wav`
+- `wav/Turn-off-up-down-swing__BH123_SE_F001_normal_100.wav`
+- `wav/Turn-on-AC__BH123_SE_F003_normal_062.wav`
+- `wav/Turn-on-ECO-level-1__BH123_SE_F003_normal_129.wav`
+- `wav/Turn-on-ECO-level-2__BH123_SE_F001_normal_130.wav`
+- `wav/Turn-on-ECO-level-3__BH123_SE_F004_normal_131.wav`
+- `wav/Turn-on-ECO-level-4__BH123_SE_F001_normal_132.wav`
+- `wav/Turn-on-ECO-level-5__BH123_SE_F001_normal_133.wav`
+- `wav/Turn-on-Energy-Saving-Mode__BH123_SE_F001_normal_128.wav`
+- `wav/Turn-on-Health__BH123_SE_F001_normal_125.wav`
+- `wav/Turn-on-Light__BH123_SE_F001_normal_135.wav`
+- `wav/Turn-on-aircon__BH123_SE_F003_normal_061.wav`
+- `wav/Turn-on-left-right-swing__BH123_SE_F001_normal_097.wav`
+- `wav/Turn-on-up-down-swing__BH123_SE_F001_normal_098.wav`
+- `wav/Turn-up-volume__BH123_SE_F001_normal_105.wav`
+- `wav/Turn-volume-down-to-minimum__BH123_SE_F001_normal_108.wav`
+- `wav/Turn-volume-up-to-maximum__BH123_SE_F001_normal_107.wav`
+- `wav/Turnonquietmode__BH123_SE_F002_normal_103.wav`
+- `wav/Turnonself-cleaning__BH123_SE_F001_normal_101.wav`
+- `wav/Turnonturbo__BH123_SE_F001_normal_109.wav`
+- `wav/Turu-off-Light__BH123_SE_F004_normal_136.wav`
+- `wav/Twenty-degrees__BH123_SE_F002_normal_080.wav`
+- `wav/Twenty-eight-degrees__BH123_SE_F001_normal_088.wav`
+- `wav/Twenty-five-degrees__BH123_SE_F002_normal_085.wav`
+- `wav/Twenty-four-degrees__BH123_SE_F001_normal_084.wav`
+- `wav/Twenty-nine-degrees__BH123_SE_F001_normal_089.wav`
+- `wav/Twenty-one-degrees__BH123_SE_F001_normal_081.wav`
+- `wav/Twenty-seven-degrees__BH123_SE_F001_normal_087.wav`
+- `wav/Twenty-six-degrees__BH123_SE_F001_normal_086.wav`
+- `wav/Twenty-three-degrees__BH123_SE_F001_normal_083.wav`
+- `wav/Twenty-two-degrees__BH123_SE_F001_normal_082.wav`
+- `wav/Wake__hellohaier_norm.wav`
 
 ## Install the skill
 
@@ -49,23 +120,16 @@ Copy this folder into:
 
 ```text
 ~/.codex/skills/cskflashtest
+~/.config/opencode/skills/cskflashtest
 ```
 
-Then restart Codex.
-
-## 云端导入包
-
-为了让导入器通过 **1MB/单文件** 限制，云端仓库只保留脚本、配置、文档和 75 个 wav 音频：
-
-- 不包含 `fw/` 下的 CSK/HISI 固件；
-- 不包含 `burn/` 下的烧录工具和厂商工具包；
-- 实际烧录前，优先从 OSS 资产包自动恢复；网络不可用时，再从本地或可信介质按 [手动资产清单](references/manual-assets.md) 补齐路径，并核对 SHA-256；本机端口配置 `config/devices.json` 不上传。
-
-**本机原有固件、工具和测试日志不删除。**云端删除只是让受限客户端能导入；没有手动补资产的客户端不能直接烧录。导入时使用最新 `main`，不要沿用含大文件的旧快照。
+Then restart Codex or OpenCode.
 
 ## Usage and workflow
 
 本 Skill 只服务当前 CSK 烧录项目，不复制、不修改 `lstest`。运行时把 `lstest` 当作公共库，复用其 `TaskArtifacts`、`DeviceProfile`、`ScenarioRuntime`、`ToolLogValidator` 和四类产物标准。
+
+云端只分发脚本、配置、文档和 WAV；本地烧录固件与厂商工具保持原样，不上传。其他客户端下载后，烧录预检或 HISI 入口会优先从 OSS 资产包恢复缺失文件；无网络时按 [手动资产清单](references/manual-assets.md) 手动补齐。未补齐前只能使用无需烧录资产的功能，不能直接烧录。
 
 ## 适用场景
 
@@ -88,23 +152,38 @@ Then restart Codex.
 
 ## 附带资源
 
-云端只包含脚本、配置、文档和 WAV；下列工具与固件**必须手动添加**，清单、大小及 SHA-256 见 [references/manual-assets.md](references/manual-assets.md)：
+云端导入包只包含脚本、配置、文档和 WAV；烧录工具及固件均**不随云端上传**，本地已验证的文件保持原样。烧录前按 [references/manual-assets.md](references/manual-assets.md) 手动添加并校验。以下烧录路径是手动补齐的目标位置：
 
 - `burn/Uart_Burn_Tool.exe`：CSK 烧录工具；
 - `fw/V46.1.8_20261102093954/CSK/fw.hex`：hex 固件；
 - `fw/V46.1.8_20261102093954/HISI/ws63-liteos-app_all.fwpkg`：HISI/WS63 烧录包；
 - `wav/Wake__hellohaier_norm.wav`：唤醒词；
-- `wav/Turn-down-volume__Turn down volume_norm.wav`：交互命令词；
+- `wav/Turn-on-aircon__BH123_SE_F003_normal_061.wav`：交互命令词“打开空调”（Turn on aircon）；
 - `wav/*.wav`：每个意图保留 1 个 normal 文件，全部平铺在 `wav/` 下。
 
-本仓库已内置运行所需的 `lstest/scripts` 公共运行时；完整 `lstest` 测试和文档不包含。若项目根目录另有 `lstest`，脚本优先使用项目根目录版本。
+本仓库**不内置** `lstest` 副本，运行时依赖外部 `lstest` 公共库，复用其 `TaskArtifacts`、`DeviceProfile`、`ScenarioRuntime`、`ToolLogValidator` 和四类产物标准。入口按以下顺序解析 `lstest`，找不到直接报错，不回退到任何内置副本：
+
+1. 已可导入的 `lstest` 包（`pip install`）；
+2. 环境变量 `LSTEST_HOME` 指向 lstest 仓库根目录；
+3. 与本仓库同级的 `lstest` 目录（现场机器历史布局）。
+
+## 云端导入包
+
+为了让导入器通过 **1MB/单文件** 限制，云端仓库只保留脚本、配置、文档和 75 个 wav 音频：
+
+- 不包含 `fw/` 下的 CSK/HISI 固件；
+- 不包含 `burn/` 下的烧录工具和厂商工具包；
+- 实际烧录前，优先从 OSS 资产包自动恢复；网络不可用时，再从本地或可信介质按 [手动资产清单](references/manual-assets.md) 补齐路径，并核对 SHA-256；本机端口配置 `config/devices.json` 不上传。
+
+**本机原有固件、工具和测试日志不删除。**云端删除只是让受限客户端能导入；没有手动补资产的客户端不能直接烧录。导入时使用最新 `main`，不要沿用含大文件的旧快照。
 
 ## 环境准备
 
 - Windows + Python 3.10+；
 - 首次运行执行 `install_requirements.bat`，或 `python -m pip install -r requirements.txt`；
-- 需要 FFmpeg 用于音频转换，`tts` 需要 `edge-tts`，播放需要 `pygame`，串口需要 `pyserial`；
-- `config/devices.json` 是本地端口配置；云端提供脚本、音频和内置 `lstest/scripts`，固件与工具须手动补齐。
+- `lstest` 公共运行时（必需，不随本仓库分发）：`python -m pip install "lstest @ git+https://github.com/zjashanda/lstest.git@<commit>"`，或设 `LSTEST_HOME`，或把 `lstest` 检出到与本仓库同级；
+- 需要 FFmpeg 用于音频转换，播放需要 `pygame`，串口需要 `pyserial`；语音合成由 `lstest` 统一走 `lstts`，本仓库不再依赖 `edge-tts`；
+- `config/devices.json` 是本地端口配置，不上传云端；云端提供脚本、音频与依赖声明，固件与工具须按 [手动资产清单](references/manual-assets.md) 补齐。
 
 ## 快速开始
 
@@ -158,6 +237,78 @@ cskflashtest\run_multi.bat --rounds 100 --no-hisi
 cskflashtest\run_multi.bat --rounds 100 --max-parallel 5 --stagger 2
 ```
 
+### 手动验收脚本（按配置执行全部设备，终端实时输出）
+
+```text
+verify_burn.bat [轮数] [验收模式]
+verify_powercycle.bat [轮数] [验收模式]
+```
+
+设备数量由 `config/devices.json` 决定；启用多少台就执行多少台，不需要填写设备 ID。
+
+示例：
+
+```powershell
+verify_powercycle.bat 3 any_asr
+verify_powercycle.bat 3 any_asr_playback
+verify_burn.bat 1 strict
+```
+
+终端会按设备标签实时输出：轮次、上下电、CSK 启动、log level、唤醒、识别结果、播报检查和本轮判定。
+
+每轮结束额外输出：
+
+- `[STATS] ...`：当前设备的累计 `pass/fail` 和 `hit/misheard/empty/asleep`。
+- `[TOTAL] ...`：当前所有设备的累计 `pass/fail` 和四态统计。
+
+任务结束输出 `[OUTCOME]` 表格，并写入 `summary_outcomes.csv`（按设备统计轮数、成功、失败、四态、多结果和平均单轮耗时）。
+
+## 长跑稳定性约束
+
+- `SerialCollector` 使用 append-only `serial_logs` + tailing parser + 有界 `FactStore`（每端口 2 万条），不再保留全量串口事件。
+- parser 单行缓冲上限 4MiB；超限丢弃当前缓冲并记录 `SERIAL_LINE_OVERSIZED`，防止无换行日志无限增长。
+- `TimelineLedger`、`ScenarioRuntime`、`TaskArtifacts` 在每个 case 结束后释放 case facts、anomalies、window、metadata 和 position。
+- 最终 `results.csv` 对账和 `tool.log` 校验使用流式读取，禁止 `read_text()` 或全量 row list。
+- `StopSupervisor` 在磁盘低于阈值时请求 `DISK_STOP_LINE`；1000 小时运行仍需预留约 80–100GB 日志/结果空间（4 台估算）。
+- 上述约束只覆盖代码层；USB、串口驱动、声卡、电源和设备固件属于外部风险。`test_start` 约 6 小时运行上限也属于外部启动工具限制。
+- 长跑回归：`python -m unittest tests.test_serial_fact_store tests.test_long_run_soak -v`。
+
+## 两套压测入口
+
+### 1. 烧录 + 唤醒/ASR
+
+默认模式，入口不变：
+
+```powershell
+python -u scripts/run_multi.py --mode burn --devices config/devices.json --rounds 20 --interaction-test --no-hisi
+run_multi.bat --rounds 20 --interaction-test --no-hisi
+```
+
+结果前缀：`result/<timestamp>_cskflashtest_...`
+
+### 2. 上下电 + CSK 初始化 + 唤醒/ASR
+
+不调用烧录工具，也不占用烧录串口：
+
+```powershell
+python -u scripts/run_multi.py --mode powercycle --devices config/devices.json --rounds 20 --interaction-test --no-hisi
+run_powercycle.bat --rounds 20 --interaction-test --no-hisi
+preflight_powercycle.bat
+```
+
+单轮时序：
+
+1. `uut-csk-boot.off`：确保退出 boot；
+2. `uut-switch1.off`：断电；
+3. 等待 `pre_burn_wait_s`；
+4. `uut-switch1.on`：上电；
+5. 等待 `AP Boot Ready !!!`；
+6. 设置 `flash.setloglev 4`；
+7. 唤醒 + ASR 交互（如启用）。
+
+结果前缀：`result/<timestamp>_cskpowercycle_...`
+多设备唤醒仍受 `audio_lock.slots=4` 限制，最多 4 台同时播报。
+
 ## CSK 初始化完成标记
 
 - 主标记：`[A/W:181:BOOT] AP Boot Ready !!!`
@@ -198,9 +349,7 @@ cskflashtest\run_multi.bat --rounds 100 --max-parallel 5 --stagger 2
 
 ## HISI / WS63 烧录
 
-HISI 与 CSK 使用不同工具、不同固件包和不同串口波特率，完整步骤见 [references/hisi-burn.md](references/hisi-burn.md)。
-
-关键差异：
+HISI 与 CSK 使用独立工具、固件包和串口参数，完整流程见 [references/hisi-burn.md](references/hisi-burn.md)。
 
 | 项目 | CSK | HISI / WS63 |
 |---|---|---|
@@ -210,7 +359,7 @@ HISI 与 CSK 使用不同工具、不同固件包和不同串口波特率，完�
 | 应用日志/AT 波特率 | `115200` | `1500000` |
 | 结果日志 | Uart_Burn_Tool 输出 + CSK 日志 | `BurnTool_Gold/optLog/optLog_*.txt` + HISI/CSK 日志 |
 
-单台 HISI 烧录示例：
+单台示例：
 
 ```powershell
 cd D:\workstation\quattro\102200cskflashst\burn\VenusA+WS63\VenusA+WS63
@@ -224,14 +373,7 @@ python -u auto_burn.py `
   --ws63-burn-kick-delay-ms 1500
 ```
 
-成功判定：
-
-```text
-BurnTool optLog: 烧写结果：成功
-AT+FTM=0: +FTM SWITCH: start ... OK
-```
-
-不要把 `HISI/out/update.fwpkg` 传给 BurnTool，它是 OTA 包。
+成功判定：`optLog` 出现 `烧写结果：成功`，且 `AT+FTM=0` 返回 `+FTM SWITCH: start ... OK`。`HISI/out/update.fwpkg` 是 OTA 包，不能用于 BurnTool。
 
 ## 初始化后设置 log level
 
@@ -287,44 +429,82 @@ python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json
 
 - 使用 `wake.render_device_key` 指定的声卡，不回落系统默认声卡；
 - 初始化完成后切换英文 `algo.switch.lang 0`，再播报唤醒词；
-- 每次唤醒失败最多尝试 5 次，每轮把失败次数写入 `wake_failures` / `wake.failed_attempts`；
-- 5 次均失败时本轮 `wake_result=FAIL`，但不会中断后续轮次；
+- 每次唤醒失败最多尝试 4 次（首次 + 3 次重试），每轮把失败次数写入 `wake_failures` / `wake.failed_attempts`；
+- 4 次均失败时本轮 `wake_result=FAIL`，但不会中断后续轮次；
 - 多设备可加 `--wake-test`：`run_multi.bat --rounds 1 --wake-test`。
 
 ## 命令词交互校验
 
-唤醒成功后播报命令词 `Turn down volume`（已转换为 16k 单声道 WAV，并使用归一化版本）：
+唤醒成功后播报命令词“打开空调”：
 
 ```text
-wav/Turn-down-volume__Turn down volume_norm.wav
+wav/Turn-on-aircon__BH123_SE_F003_normal_061.wav
 ```
 
-期望结果：
+单轮交互结果统一为四种：
 
-```text
-keyword:Turn down volume
-vir_kid:78
-refresh volume from <before> to <after>
-```
+- `hit`：唤醒成功，识别到目标词 `Turn on aircon`；
+- `misheard`：唤醒成功，有识别结果但不是目标词（例如 `Turn on ECO`）；
+- `empty`：唤醒成功，但没有识别结果；
+- `asleep`：未唤醒。
 
-- 校验 ASR 关键词、`vir_kid` 和音量变化；
-- 默认要求音量下降，例如 `70 -> 60`；
-- 设备侧响应日志包含 `_volume_adjust` / 音量调整提示音；
-- 实测结果：`Turn down volume` 识别正确，音量 `70 -> 60`。
+验收模式通过 `--acceptance` 选择（默认 `any_asr`）：
+
+| 模式 | 唤醒 | 唤醒播报 | ASR 结果 | 识别响应/播报 | 多唤醒/多识别 |
+|---|---|---|---|---|---|
+| `wake_only` | 要求 | 不检查 | 不检查 | 不检查 | 记录 |
+| `wake_playback` | 要求 | 至少 1 次完整播报 | 不检查 | 不检查 | 记录 |
+| `strict` | 要求 | 不检查 | 只接受 `hit` | 不检查 | **FAIL** |
+| `strict_playback` | 要求 | 至少 1 次完整播报 | 只接受 `hit` | 要求响应 + 至少 1 次完整播报 | **FAIL** |
+| `any_asr` | 要求 | 不检查 | `hit` / `misheard` | 不检查 | 记录 |
+| `any_asr_playback` | 要求 | 至少 1 次完整播报 | `hit` / `misheard` | 要求响应 + 至少 1 次完整播报 | 记录 |
+| `asr_optional` | 要求 | 不检查 | `hit` / `misheard` / `empty`；整轮任务至少一次非空 | 不检查 | 记录 |
+| `asr_optional_playback` | 要求 | 至少 1 次完整播报 | `hit` / `misheard` / `empty`；整轮任务至少一次非空 | 有识别结果的轮次要求响应 + 至少 1 次完整播报 | 记录 |
+
+规则：
+
+- 以上都是**单轮交互**判定；`asr_optional` 的“至少一次非空”是额外的任务级约束；
+- 单轮内所有唤醒结果和识别结果都记录到 `wake_results` / `asr_results`，并统计次数；
+- 一次播放出现多个唤醒结果或多个识别结果时，记录 `MULTI_WAKE` / `MULTI_ASR` / `MULTI_RESULT` 异常；
+- `strict` / `strict_playback` 遇到多结果直接 FAIL；其他模式只记录，不影响本轮通过；
+- 唤醒播报默认按 1 次检查；
+- 识别播报允许 1 次或多次，每次要求 PLAYING → COMPLETE 或 start → stop；
+- 唤醒失败或无识别结果才重试，最多 4 次（首次 + 3 次重试）；
+- 误识别不重试；
+- 不再校验音量变化，`vir_kid` 仅记录；
+- 上下电测试默认使用 `any_asr`。
 
 命令：
 
 ```powershell
-python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json --device-id dev01 --rounds 1 --skip-burn --wake-test --interaction-test --no-hisi
+python -u cskflashtest/scripts/run.py --devices cskflashtest/config/devices.json --device-id dev01 --rounds 1 --skip-burn --acceptance any_asr --no-hisi
 ```
 
-`--interaction-test` 会自动启用唤醒测试；多设备时加 `--interaction-test`，并为每台设备配置自己的 `render_device_key`。
+`--acceptance strict/any_asr/asr_optional/strict_playback/any_asr_playback/asr_optional_playback` 会自动启用唤醒和 ASR；`--acceptance wake_only/wake_playback` 只验证唤醒。多设备时每台设备仍需配置自己的 `render_device_key`。
 
-低音量边界：
+## 压测前初始化清理
 
-- 实测音量 `40 -> 30`、`30 -> 20` 后设备出现 `Boot Reason: CRASH 0x30`，这不是正常的“最小音量”响应；
-- 为避免重复触发固件崩溃，`interaction.min_volume` 默认 40：启动后音量不高于 40 时跳过降音量命令，记录 `volume_boundary=PASS`；
-- 交互日志若出现 `Boot Reason: CRASH` / `CSK AP Ready after exception`，会按设备异常记录，不会被当作正常音量响应。
+`run_multi.py` 启动前自动调用 `lstest` 的 `environment_cleanup`：
+
+- 清空 `logs/audio_slots`；
+- 杀掉残留的 `listenai_play.py` / `internal-play-once` 进程；
+- 删除过期的临时音频；
+- 扫描 Render 端点，记录未使用/缺失的声卡 Key。
+
+## 串口断开重连
+
+控制口无提示符时，`run.py` 调用 `lstest` 的 `serial_recovery`：
+
+- 最多 20 次重开；
+- 等待从 0.5s 起逐步延长到 30s；
+- 每次用 3s 探测 `root:/$`；
+- 全部失败才判 `control_alive` FAIL，连续 3 轮失败停止任务。
+
+## 结果目录命名
+
+`<批次时间戳>_<场景>_<设备ID>_<任务简介>_<总次数>rounds`
+
+同一批设备共用批次时间戳；同一设备同一任务多次运行追加到同一目录。
 
 ## 烧录成功判定
 
@@ -392,5 +572,5 @@ python cskflashtest/scripts/commission.py --key hex --update --tool-md5 0x...
 
 - CSK 主流程不包含 HISI 烧录；HISI/WS63 使用独立工具，步骤见 [references/hisi-burn.md](references/hisi-burn.md)；
 - 不把烧录工具输出写进 `tool.log`；
-- 不修改 `lstest` 目录；
+- 不修改 `lstest` 仓库（外部依赖，只读引用）；
 - 不在预检失败时猜测日志含义或继续上电烧录。

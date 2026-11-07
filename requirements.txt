@@ -1,4 +1,4 @@
+# 运行时还依赖外部 lstest 公共库（不随本仓库分发），安装方式见 SKILL.md「环境准备」
 pyserial>=3.5
-edge-tts>=6.1
 pygame>=2.5; platform_system == "Windows"
 numpy>=1.24

@@ -17,7 +17,8 @@
 
 ```powershell
 python -m unittest tests.test_serial_fact_store tests.test_long_run_soak -v
-python -m py_compile scripts\burn_adapter.py scripts\run.py lstest\scripts\core.py lstest\scripts\timeline.py lstest\scripts\runtime.py
+# lstest 是外部依赖：LSTEST_HOME 指向其仓库根目录，或与本仓库同级
+python -m py_compile scripts\burn_adapter.py scripts\run.py "$env:LSTEST_HOME\scripts\core.py" "$env:LSTEST_HOME\scripts\timeline.py" "$env:LSTEST_HOME\scripts\runtime.py"
 ```
 
 ## 合成 soak 覆盖

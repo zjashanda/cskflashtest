@@ -7,8 +7,12 @@ import pytest
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = SKILL_ROOT.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from lstest_env import ensure_lstest_runtime  # noqa: E402
+
+ensure_lstest_runtime()
 
 from lstest.scripts.profile import DeviceProfile, ProfileFixtureRunner, RawLogRecord  # noqa: E402
 
